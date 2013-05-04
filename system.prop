@@ -35,7 +35,8 @@ ro.ril.hsxpa=1
 ro.ril.gprsclass=10
 ro.telephony.ril_class=SamsungMSMRIL
 mobiledata.interfaces=pdp0,gprs,ppp0
-ro.telephony.call_ring.delay=0
+ro.telephony.call_ring.multiple=false
+ro.telephony.call_ring.delay=3000
 ro.ril.disable.power.collapse=0
 DEVICE_PROVISIONED=1
 
