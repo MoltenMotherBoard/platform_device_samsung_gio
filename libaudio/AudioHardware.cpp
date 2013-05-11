@@ -32,7 +32,7 @@
 
 // hardware specific functions
 #include "AudioHardware.h"
-#include <media/AudioRecord.h>
+#include "AudioRecord.h"
 
 #define COMBO_DEVICE_SUPPORTED 1 // Headset speaker combo device is supported on this target
 
