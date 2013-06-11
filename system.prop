@@ -65,6 +65,9 @@ persist.sys.usb.config=adb,mass_storage
 persist.service.adb.enable=1
 ro.vold.umsdirtyratio=20
 
+## ADB notification (disabled)
+persist.adb.notify=0
+
 ## Camcorder
 debug.camcorder.disablemeta=1
 
