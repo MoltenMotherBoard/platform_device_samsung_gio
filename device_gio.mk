@@ -16,7 +16,7 @@
 $(call inherit-product, vendor/samsung/gio/vendor_blobs.mk)
 
 # MMB Vendor
-$(call inherit-product, vendor/mmb/vendor_blobs.mk)
+$(call inherit-product, vendor/mmb/vendor_blobs_cm.mk)
 
 # Including GApps
 $(call inherit-product, vendor/google/tiny.mk)
