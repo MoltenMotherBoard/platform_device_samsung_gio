@@ -15,28 +15,33 @@
 ## Inherit vendor proprietary files
 $(call inherit-product, vendor/samsung/gio/vendor_blobs.mk)
 
-# Using our vendor (Superuser, hosts file and APNS)
-$(call inherit-product, vendor/mmb/vendor_blobs.mk)
-# Including GApps
-$(call inherit-product, vendor/google/tiny.mk)
-
 include device/samsung/msm7x27-common/common.mk
 
 ## Device specific overlay
 DEVICE_PACKAGE_OVERLAYS := device/samsung/gio/overlay
 
-## Camera
-PRODUCT_PACKAGES += \
-    camera.msm7x27
-
 ## Audio
 PRODUCT_PACKAGES += \
-   audio.primary.msm7x27 \
-   audio_policy.msm7x27
+    audio.primary.gio \
+    audio_policy.gio
 
-## Lights
+## Camera
 PRODUCT_PACKAGES += \
-   lights.msm7x27
+    camera.gio \
+    libjni_legacymosaic \
+    LegacyCamera
+
+## Liblights
+#PRODUCT_PACKAGES += \
+#    lights.gio
+
+## Wifi
+#PRODUCT_PACKAGES += \
+#    abtfilt \
+#    wlan_tool \
+#    wmiconfig \
+    eeprom-AR6002 \
+    ar6000.ko
 
 ## Ramdisk
 PRODUCT_COPY_FILES += \
@@ -46,4 +51,5 @@ PRODUCT_COPY_FILES += \
     device/samsung/gio/ramdisk/GIO.rle:root/GIO.rle
 
 ## LDPI assets
+PRODUCT_AAPT_CONFIG := normal hdpi mdpi
 PRODUCT_AAPT_PREF_CONFIG := mdpi
