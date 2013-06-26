@@ -31,9 +31,9 @@ PRODUCT_PACKAGES += \
     libjni_legacymosaic \
     LegacyCamera
 
-## Liblights
-#PRODUCT_PACKAGES += \
-#    lights.gio
+## Lights
+PRODUCT_PACKAGES += \
+   lights.msm7x27
 
 ## Wifi
 #PRODUCT_PACKAGES += \
