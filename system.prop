@@ -77,3 +77,6 @@ ro.HOME_APP_ADJ=1
 ## Google's location features
 ro.com.google.locationfeatures=1
 ro.com.google.networklocation=1
+
+## Less apps in background
+sys.mem.max_hidden_apps=13
