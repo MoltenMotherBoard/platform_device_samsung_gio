@@ -69,8 +69,8 @@
         <item>"wlan\\d"</item>
     </string-array>
     
-    <!-- The default iface on which to monitor data use 
-    <string name="config_datause_iface">pdp0</string> -->
+    <!-- The default iface on which to monitor data use --> 
+    <string name="config_datause_iface">pdp0</string>
 
     <!-- List of regexpressions describing the interface (if any) that represent tetherable
          Wifi interfaces.  If the device doesn't want to support tethering over Wifi this
