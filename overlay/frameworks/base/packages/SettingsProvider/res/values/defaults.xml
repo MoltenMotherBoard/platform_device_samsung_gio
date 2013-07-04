@@ -1,6 +1,6 @@
 <resources>
-    <!-- Set the automatic brightness mode on by default -->
+    <!-- Set the automatic brightness mode off by default -->
     <bool name="def_screen_brightness_automatic_mode">false</bool>
-
+    <!-- Enable non-Market installation by default -->
     <bool name="def_install_non_market_apps">true</bool>
 </resources>
