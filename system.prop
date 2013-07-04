@@ -52,7 +52,7 @@ wifi.interface=wlan0
 wifi.ap.interface=athap0
 
 ## Memory
-sys.mem.max_hidden_apps=10
+sys.mem.max_hidden_apps=15
 
 sys.mem.FOREGROUND_APP_ADJ=0
 sys.mem.VISIBLE_APP_ADJ=3
