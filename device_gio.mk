@@ -28,8 +28,8 @@ DEVICE_PACKAGE_OVERLAYS := device/samsung/gio/overlay
 
 ## Audio
 PRODUCT_PACKAGES += \
-    audio.primary.gio \
-    audio_policy.gio
+    audio.primary.msm7x27 \
+    audio_policy.msm7x27
 
 ## Camera
 PRODUCT_PACKAGES += \
