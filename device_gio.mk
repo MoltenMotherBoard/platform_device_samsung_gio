@@ -33,7 +33,7 @@ PRODUCT_PACKAGES += \
 
 ## Camera
 PRODUCT_PACKAGES += \
-    camera.gio \
+    camera.msm7x27 \
     libjni_legacymosaic \
     LegacyCamera
 
