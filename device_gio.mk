@@ -16,6 +16,9 @@
 $(call inherit-product, build/target/product/languages_full.mk)
 $(call inherit-product, build/target/product/full_base.mk)
 
+# Test for arabic languages
+$(call inherit-product, build/target/product/locales_full.mk)
+
 # Using our vendor (Superuser, hosts file and APNS)
 $(call inherit-product, vendor/mmb/vendor_blobs.mk)
 # Including GApps
@@ -237,6 +240,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
     persist.sys.headset-attn=0 \
     persist.sys.speaker-attn=0
 
+# Rom Manager
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.rommanager.developerid=mmb \
+    ro.modversion=aosp-gb_$(shell date +"%d.%m.%y-%s")
+    
 # Product infos
 PRODUCT_NAME := gio
 PRODUCT_DEVICE := gio
