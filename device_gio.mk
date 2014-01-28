@@ -240,3 +240,11 @@ PRODUCT_DEVICE := gio
 PRODUCT_MODEL := GT-S5660
 PRODUCT_BRAND := samsung
 PRODUCT_MANUFACTURER := samsung
+
+# Arabic languages
+$(call inherit-product, build/target/product/locales_full.mk)
+
+# ROM Manager
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.rommanager.developerid=mmb \
+    ro.modversion=cm7_$(shell date +"%d.%m.%y-%s")
