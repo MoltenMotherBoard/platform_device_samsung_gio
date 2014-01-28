@@ -54,4 +54,4 @@ $(call inherit-product, build/target/product/locales_full.mk)
 # Rom Manager
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.rommanager.developerid=mmb \
-    ro.modversion=aosp-gb_$(shell date +"%d.%m.%y-%s")
+    ro.modversion=aosp-ics_$(shell date +"%d.%m.%y-%s")
