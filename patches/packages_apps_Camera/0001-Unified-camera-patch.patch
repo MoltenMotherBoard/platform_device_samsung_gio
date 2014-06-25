@@ -1,0 +1,76 @@
+From 82f7cd8197118547284c2fcf7cb97c13f46d3de7 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Wed, 25 Jun 2014 21:51:48 +0200
+Subject: [PATCH] Unified camera patch [*]Adjusted layout for low resolution
+ devices [*]Excluded video effects [*]Excluded frame intervals
+
+---
+ res/xml/video_preferences.xml                     | 15 ---------------
+ src/com/android/camera/ui/ControlPanelLayout.java | 11 +++++++++++
+ 2 files changed, 11 insertions(+), 15 deletions(-)
+
+diff --git a/res/xml/video_preferences.xml b/res/xml/video_preferences.xml
+index e158139..e34ce57 100644
+--- a/res/xml/video_preferences.xml
++++ b/res/xml/video_preferences.xml
+@@ -25,13 +25,6 @@
+             camera:entries="@array/pref_video_quality_entries"
+             camera:entryValues="@array/pref_video_quality_entryvalues"/>
+     <IconListPreference
+-            camera:key="pref_video_time_lapse_frame_interval_key"
+-            camera:defaultValue="@string/pref_video_time_lapse_frame_interval_default"
+-            camera:title="@string/pref_video_time_lapse_frame_interval_title"
+-            camera:largeIcons="@array/video_timelapse_largeicons"
+-            camera:entries="@array/pref_video_time_lapse_frame_interval_entries"
+-            camera:entryValues="@array/pref_video_time_lapse_frame_interval_entryvalues"/>
+-    <IconListPreference
+             camera:key="pref_camera_video_flashmode_key"
+             camera:defaultValue="@string/pref_camera_video_flashmode_default"
+             camera:title="@string/pref_camera_flashmode_title"
+@@ -54,14 +47,6 @@
+             camera:icons="@array/camera_id_icons"
+             camera:entries="@array/camera_id_entries"
+             camera:largeIcons="@array/camera_id_largeicons"/>
+-    <IconListPreference
+-            camera:key="pref_video_effect_key"
+-            camera:defaultValue="@string/pref_video_effect_default"
+-            camera:title="@string/pref_video_effect_title"
+-            camera:icons="@array/video_effect_icons"
+-            camera:largeIcons="@array/video_effect_icons"
+-            camera:entries="@array/pref_video_effect_entries"
+-            camera:entryValues="@array/pref_video_effect_entryvalues" />
+     <RecordLocationPreference
+             camera:key="pref_camera_recordlocation_key"
+             camera:defaultValue="@string/pref_camera_recordlocation_default"
+diff --git a/src/com/android/camera/ui/ControlPanelLayout.java b/src/com/android/camera/ui/ControlPanelLayout.java
+index 24efb8b..3222081 100644
+--- a/src/com/android/camera/ui/ControlPanelLayout.java
++++ b/src/com/android/camera/ui/ControlPanelLayout.java
+@@ -32,6 +32,11 @@ import android.widget.RelativeLayout;
+ public class ControlPanelLayout extends RelativeLayout {
+     private static final String TAG = "ControlPanelLayout";
+ 
++    /* Since there's no API in ICS to get minWidth and minHeight from
++     * layout/camera_control.xml we need to hardcode those values here too. */
++    private final int MIN_WIDTH = 260;
++    private final int MIN_HEIGHT = 76;
++
+     public ControlPanelLayout(Context context, AttributeSet attrs) {
+         super(context, attrs);
+     }
+@@ -66,6 +71,12 @@ public class ControlPanelLayout extends RelativeLayout {
+             Log.e(TAG, "layout_xxx of ControlPanelLayout should be wrap_content");
+         }
+ 
++        // The size cannot be smaller than minimum constraint.
++        int minimumSize = (isLandscape) ? MIN_WIDTH : MIN_HEIGHT;
++        if (measuredSize < minimumSize) {
++            measuredSize = minimumSize;
++        }
++
+         // The width cannot be bigger than the constraint.
+         if (mode == MeasureSpec.AT_MOST && measuredSize > specSize) {
+             measuredSize = specSize;
+-- 
+1.8.3.2
+
