@@ -1,0 +1,42 @@
+From 008294ce8b6312ab4934acc7c9863ef42553740b Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Wed, 25 Jun 2014 22:26:29 +0200
+Subject: [PATCH] Now Mms shows newline
+
+---
+ res/layout/compose_message_activity.xml            | 2 +-
+ src/com/android/mms/ui/ComposeMessageActivity.java | 5 +++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/res/layout/compose_message_activity.xml b/res/layout/compose_message_activity.xml
+index 7af3d49..53a06f5 100644
+--- a/res/layout/compose_message_activity.xml
++++ b/res/layout/compose_message_activity.xml
+@@ -144,7 +144,7 @@
+                     android:hint="@string/type_to_compose_text_enter_to_send"
+                     android:minHeight="@dimen/input_text_height"
+                     android:maxLines="3"
+-                    android:inputType="textShortMessage|textAutoCorrect|textCapSentences|textMultiLine"
++                    android:inputType="textAutoCorrect|textCapSentences|textMultiLine"
+                     android:imeOptions="actionSend|flagNoEnterAction"
+                 />
+ 
+diff --git a/src/com/android/mms/ui/ComposeMessageActivity.java b/src/com/android/mms/ui/ComposeMessageActivity.java
+index 085822f..642aa60 100644
+--- a/src/com/android/mms/ui/ComposeMessageActivity.java
++++ b/src/com/android/mms/ui/ComposeMessageActivity.java
+@@ -3165,8 +3165,9 @@ public class ComposeMessageActivity extends Activity
+ 
+     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+         if (event != null) {
+-            // if shift key is down, then we want to insert the '\n' char in the TextView;
+-            // otherwise, the default action is to send the message.
++            if (((event.getKeyCode() == KeyEvent.KEYCODE_DPAD_CENTER) || (event.getKeyCode() == KeyEvent.KEYCODE_ENTER))) {
++                return false;
++            }
+             if (!event.isShiftPressed()) {
+                 if (isPreparedForSending()) {
+                     confirmSendMessageIfNeeded();
+-- 
+1.8.3.2
+
