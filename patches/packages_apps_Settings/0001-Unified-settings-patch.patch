@@ -1,0 +1,1224 @@
+From 165f90ba69ad7812f56d8a537d7c3886c1a9912b Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Wed, 25 Jun 2014 22:46:35 +0200
+Subject: [PATCH] Unified settings patch [*]Excluded System updates [*]Excluded
+ Bluetooth tethering [*]Excluded WiFi Direct
+
+---
+ res/xml/device_info_settings.xml                   |  15 -
+ res/xml/tether_prefs.xml                           |   2 +
+ res/xml/wireless_settings.xml                      |  12 -
+ src/com/android/settings/DeviceInfoSettings.java   |  16 -
+ src/com/android/settings/TetherSettings.java       | 143 ---------
+ src/com/android/settings/Utils.java                |  14 +-
+ src/com/android/settings/WirelessSettings.java     |  24 +-
+ .../android/settings/wifi/p2p/WifiP2pDialog.java   | 132 --------
+ .../android/settings/wifi/p2p/WifiP2pEnabler.java  | 117 -------
+ src/com/android/settings/wifi/p2p/WifiP2pPeer.java | 103 -------
+ .../android/settings/wifi/p2p/WifiP2pSettings.java | 337 ---------------------
+ 11 files changed, 7 insertions(+), 908 deletions(-)
+ delete mode 100644 src/com/android/settings/wifi/p2p/WifiP2pDialog.java
+ delete mode 100644 src/com/android/settings/wifi/p2p/WifiP2pEnabler.java
+ delete mode 100644 src/com/android/settings/wifi/p2p/WifiP2pPeer.java
+ delete mode 100644 src/com/android/settings/wifi/p2p/WifiP2pSettings.java
+
+diff --git a/res/xml/device_info_settings.xml b/res/xml/device_info_settings.xml
+index 93347c6..d1a0ea5 100644
+--- a/res/xml/device_info_settings.xml
++++ b/res/xml/device_info_settings.xml
+@@ -17,21 +17,6 @@
+ <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+         android:title="@string/about_settings">
+ 
+-        <!-- System update settings - launches activity -->
+-        <PreferenceScreen android:key="system_update_settings"
+-                android:title="@string/system_update_settings_list_item_title" 
+-                android:summary="@string/system_update_settings_list_item_summary">
+-            <intent android:action="android.settings.SYSTEM_UPDATE_SETTINGS" />
+-        </PreferenceScreen>
+-
+-
+-        <PreferenceScreen android:key="additional_system_update_settings"
+-                          android:title="@string/additional_system_update_settings_list_item_title">
+-            <intent android:action="android.intent.action.MAIN"
+-                    android:targetPackage="@string/additional_system_update"
+-                    android:targetClass="@string/additional_system_update_menu" />
+-        </PreferenceScreen>
+-
+         <!-- Device status - launches activity -->
+         <PreferenceScreen android:key="status_info"
+                 android:title="@string/device_status" 
+diff --git a/res/xml/tether_prefs.xml b/res/xml/tether_prefs.xml
+index 6c1fa37..c1cdbfb 100644
+--- a/res/xml/tether_prefs.xml
++++ b/res/xml/tether_prefs.xml
+@@ -31,10 +31,12 @@
+         android:title="@string/wifi_tether_configure_ap_text"
+         android:persistent="false" />
+ 
++    <!--
+     <CheckBoxPreference
+         android:key="enable_bluetooth_tethering"
+         android:title="@string/bluetooth_tether_checkbox_text"
+         android:persistent="false" />
++    -->
+ 
+     <PreferenceScreen
+         android:key="tethering_help"
+diff --git a/res/xml/wireless_settings.xml b/res/xml/wireless_settings.xml
+index 20ffd8e..beecb86 100644
+--- a/res/xml/wireless_settings.xml
++++ b/res/xml/wireless_settings.xml
+@@ -54,18 +54,6 @@
+         android:key="android_beam_settings"
+         android:title="@string/android_beam_settings_title" />
+ 
+-    <CheckBoxPreference
+-        android:key="toggle_wifi_p2p"
+-        android:title="@string/wifi_p2p_settings_title"
+-        android:persistent="false" />
+-
+-    <PreferenceScreen
+-        android:fragment="com.android.settings.wifi.p2p.WifiP2pSettings"
+-        android:key="wifi_p2p_settings"
+-        android:title="@string/wifi_p2p_settings_title"
+-        android:summary="@string/wifi_p2p_settings_summary">
+-    </PreferenceScreen>
+-
+     <PreferenceScreen
+         android:key="mobile_network_settings"
+         android:title="@string/network_settings_title"
+diff --git a/src/com/android/settings/DeviceInfoSettings.java b/src/com/android/settings/DeviceInfoSettings.java
+index c25a466..58ad829 100644
+--- a/src/com/android/settings/DeviceInfoSettings.java
++++ b/src/com/android/settings/DeviceInfoSettings.java
+@@ -51,14 +51,12 @@ public class DeviceInfoSettings extends SettingsPreferenceFragment {
+     private static final String KEY_TERMS = "terms";
+     private static final String KEY_LICENSE = "license";
+     private static final String KEY_COPYRIGHT = "copyright";
+-    private static final String KEY_SYSTEM_UPDATE_SETTINGS = "system_update_settings";
+     private static final String PROPERTY_URL_SAFETYLEGAL = "ro.url.safetylegal";
+     private static final String KEY_KERNEL_VERSION = "kernel_version";
+     private static final String KEY_BUILD_NUMBER = "build_number";
+     private static final String KEY_DEVICE_MODEL = "device_model";
+     private static final String KEY_BASEBAND_VERSION = "baseband_version";
+     private static final String KEY_FIRMWARE_VERSION = "firmware_version";
+-    private static final String KEY_UPDATE_SETTING = "additional_system_update_settings";
+ 
+     long[] mHits = new long[3];
+ 
+@@ -100,20 +98,6 @@ public class DeviceInfoSettings extends SettingsPreferenceFragment {
+         Utils.updatePreferenceToSpecificActivityOrRemove(act, parentPreference, KEY_TEAM,
+                 Utils.UPDATE_PREFERENCE_FLAG_SET_TITLE_TO_MATCHING_ACTIVITY);
+ 
+-        // These are contained by the root preference screen
+-        parentPreference = getPreferenceScreen();
+-        Utils.updatePreferenceToSpecificActivityOrRemove(act, parentPreference,
+-                KEY_SYSTEM_UPDATE_SETTINGS,
+-                Utils.UPDATE_PREFERENCE_FLAG_SET_TITLE_TO_MATCHING_ACTIVITY);
+-        Utils.updatePreferenceToSpecificActivityOrRemove(act, parentPreference, KEY_CONTRIBUTORS,
+-                Utils.UPDATE_PREFERENCE_FLAG_SET_TITLE_TO_MATCHING_ACTIVITY);
+-
+-        // Read platform settings for additional system update setting
+-        boolean isUpdateSettingAvailable =
+-                getResources().getBoolean(R.bool.config_additional_system_update_setting_enable);
+-        if (isUpdateSettingAvailable == false) {
+-            getPreferenceScreen().removePreference(findPreference(KEY_UPDATE_SETTING));
+-        }
+     }
+ 
+     @Override
+diff --git a/src/com/android/settings/TetherSettings.java b/src/com/android/settings/TetherSettings.java
+index 867f733..1154d45 100644
+--- a/src/com/android/settings/TetherSettings.java
++++ b/src/com/android/settings/TetherSettings.java
+@@ -22,9 +22,6 @@ import com.android.settings.wifi.WifiApDialog;
+ import android.app.Activity;
+ import android.app.AlertDialog;
+ import android.app.Dialog;
+-import android.bluetooth.BluetoothAdapter;
+-import android.bluetooth.BluetoothPan;
+-import android.bluetooth.BluetoothProfile;
+ import android.content.BroadcastReceiver;
+ import android.content.Context;
+ import android.content.DialogInterface;
+@@ -57,7 +54,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+ 
+     private static final String USB_TETHER_SETTINGS = "usb_tether_settings";
+     private static final String ENABLE_WIFI_AP = "enable_wifi_ap";
+-    private static final String ENABLE_BLUETOOTH_TETHERING = "enable_bluetooth_tethering";
+     private static final String TETHERING_HELP = "tethering_help";
+     private static final String USB_HELP_MODIFIER = "usb_";
+     private static final String WIFI_HELP_MODIFIER = "wifi_";
+@@ -73,8 +69,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+     private WifiApEnabler mWifiApEnabler;
+     private CheckBoxPreference mEnableWifiAp;
+ 
+-    private CheckBoxPreference mBluetoothTether;
+-
+     private PreferenceScreen mTetherHelp;
+ 
+     private BroadcastReceiver mTetherChangeReceiver;
+@@ -83,9 +77,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+ 
+     private String[] mWifiRegexs;
+ 
+-    private String[] mBluetoothRegexs;
+-    private BluetoothPan mBluetoothPan;
+-
+     private static final String WIFI_AP_SSID_AND_SECURITY = "wifi_ap_ssid_and_security";
+     private static final int CONFIG_SUBTEXT = R.string.wifi_tether_configure_subtext;
+ 
+@@ -99,12 +90,9 @@ public class TetherSettings extends SettingsPreferenceFragment
+     private boolean mUsbConnected;
+     private boolean mMassStorageActive;
+ 
+-    private boolean mBluetoothEnableForTether;
+-
+     private static final int INVALID             = -1;
+     private static final int WIFI_TETHERING      = 0;
+     private static final int USB_TETHERING       = 1;
+-    private static final int BLUETOOTH_TETHERING = 2;
+ 
+     /* One of INVALID, WIFI_TETHERING, USB_TETHERING or BLUETOOTH_TETHERING */
+     private int mTetherChoice = INVALID;
+@@ -119,17 +107,11 @@ public class TetherSettings extends SettingsPreferenceFragment
+         addPreferencesFromResource(R.xml.tether_prefs);
+ 
+         final Activity activity = getActivity();
+-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+-        if (adapter != null) {
+-            adapter.getProfileProxy(activity.getApplicationContext(), mProfileServiceListener,
+-                    BluetoothProfile.PAN);
+-        }
+ 
+         mEnableWifiAp =
+                 (CheckBoxPreference) findPreference(ENABLE_WIFI_AP);
+         Preference wifiApSettings = findPreference(WIFI_AP_SSID_AND_SECURITY);
+         mUsbTether = (CheckBoxPreference) findPreference(USB_TETHER_SETTINGS);
+-        mBluetoothTether = (CheckBoxPreference) findPreference(ENABLE_BLUETOOTH_TETHERING);
+         mTetherHelp = (PreferenceScreen) findPreference(TETHERING_HELP);
+ 
+         ConnectivityManager cm =
+@@ -137,11 +119,9 @@ public class TetherSettings extends SettingsPreferenceFragment
+ 
+         mUsbRegexs = cm.getTetherableUsbRegexs();
+         mWifiRegexs = cm.getTetherableWifiRegexs();
+-        mBluetoothRegexs = cm.getTetherableBluetoothRegexs();
+ 
+         final boolean usbAvailable = mUsbRegexs.length != 0;
+         final boolean wifiAvailable = mWifiRegexs.length != 0;
+-        final boolean bluetoothAvailable = mBluetoothRegexs.length != 0;
+ 
+         if (!usbAvailable || Utils.isMonkeyRunning()) {
+             getPreferenceScreen().removePreference(mUsbTether);
+@@ -155,16 +135,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+             getPreferenceScreen().removePreference(wifiApSettings);
+         }
+ 
+-        if (!bluetoothAvailable) {
+-            getPreferenceScreen().removePreference(mBluetoothTether);
+-        } else {
+-            if (mBluetoothPan != null && mBluetoothPan.isTetheringOn()) {
+-                mBluetoothTether.setChecked(true);
+-            } else {
+-                mBluetoothTether.setChecked(false);
+-            }
+-        }
+-
+         mProvisionApp = getResources().getStringArray(
+                 com.android.internal.R.array.config_mobile_hotspot_provision_app);
+ 
+@@ -190,16 +160,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+                     mWifiConfig.SSID,
+                     mSecurityType[index]));
+         }
+-    }
+-
+-    private BluetoothProfile.ServiceListener mProfileServiceListener =
+-        new BluetoothProfile.ServiceListener() {
+-        public void onServiceConnected(int profile, BluetoothProfile proxy) {
+-            mBluetoothPan = (BluetoothPan) proxy;
+-        }
+-        public void onServiceDisconnected(int profile) {
+-            mBluetoothPan = null;
+-        }
+     };
+ 
+     @Override
+@@ -280,25 +240,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+             } else if (action.equals(UsbManager.ACTION_USB_STATE)) {
+                 mUsbConnected = intent.getBooleanExtra(UsbManager.USB_CONNECTED, false);
+                 updateState();
+-            } else if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+-                if (mBluetoothEnableForTether) {
+-                    switch (intent
+-                            .getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+-                        case BluetoothAdapter.STATE_ON:
+-                            mBluetoothPan.setBluetoothTethering(true);
+-                            mBluetoothEnableForTether = false;
+-                            break;
+-
+-                        case BluetoothAdapter.STATE_OFF:
+-                        case BluetoothAdapter.ERROR:
+-                            mBluetoothEnableForTether = false;
+-                            break;
+-
+-                        default:
+-                            // ignore transition states
+-                    }
+-                }
+-                updateState();
+             }
+         }
+     }
+@@ -325,7 +266,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+         activity.registerReceiver(mTetherChangeReceiver, filter);
+ 
+         filter = new IntentFilter();
+-        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
+         activity.registerReceiver(mTetherChangeReceiver, filter);
+ 
+         if (intent != null) mTetherChangeReceiver.onReceive(activity, intent);
+@@ -361,7 +301,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+     private void updateState(String[] available, String[] tethered,
+             String[] errored) {
+         updateUsbState(available, tethered, errored);
+-        updateBluetoothState(available, tethered, errored);
+     }
+ 
+ 
+@@ -420,50 +359,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+         }
+     }
+ 
+-    private void updateBluetoothState(String[] available, String[] tethered,
+-            String[] errored) {
+-        int bluetoothTethered = 0;
+-        for (String s : tethered) {
+-            for (String regex : mBluetoothRegexs) {
+-                if (s.matches(regex)) bluetoothTethered++;
+-            }
+-        }
+-        boolean bluetoothErrored = false;
+-        for (String s: errored) {
+-            for (String regex : mBluetoothRegexs) {
+-                if (s.matches(regex)) bluetoothErrored = true;
+-            }
+-        }
+-
+-        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+-        int btState = adapter.getState();
+-        if (btState == BluetoothAdapter.STATE_TURNING_OFF) {
+-            mBluetoothTether.setEnabled(false);
+-            mBluetoothTether.setSummary(R.string.wifi_stopping);
+-        } else if (btState == BluetoothAdapter.STATE_TURNING_ON) {
+-            mBluetoothTether.setEnabled(false);
+-            mBluetoothTether.setSummary(R.string.bluetooth_turning_on);
+-        } else if (btState == BluetoothAdapter.STATE_ON && mBluetoothPan.isTetheringOn()) {
+-            mBluetoothTether.setChecked(true);
+-            mBluetoothTether.setEnabled(true);
+-            if (bluetoothTethered > 1) {
+-                String summary = getString(
+-                        R.string.bluetooth_tethering_devices_connected_subtext, bluetoothTethered);
+-                mBluetoothTether.setSummary(summary);
+-            } else if (bluetoothTethered == 1) {
+-                mBluetoothTether.setSummary(R.string.bluetooth_tethering_device_connected_subtext);
+-            } else if (bluetoothErrored) {
+-                mBluetoothTether.setSummary(R.string.bluetooth_tethering_errored_subtext);
+-            } else {
+-                mBluetoothTether.setSummary(R.string.bluetooth_tethering_available_subtext);
+-            }
+-        } else {
+-            mBluetoothTether.setEnabled(true);
+-            mBluetoothTether.setChecked(false);
+-            mBluetoothTether.setSummary(R.string.bluetooth_tethering_off_subtext);
+-        }
+-    }
+-
+     public boolean onPreferenceChange(Preference preference, Object value) {
+         boolean enable = (Boolean) value;
+ 
+@@ -499,9 +394,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+                 //BT and USB need checkbox turned off on failure
+                 //Wifi tethering is never turned on until afterwards
+                 switch (mTetherChoice) {
+-                    case BLUETOOTH_TETHERING:
+-                        mBluetoothTether.setChecked(false);
+-                        break;
+                     case USB_TETHERING:
+                         mUsbTether.setChecked(false);
+                         break;
+@@ -516,19 +408,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+             case WIFI_TETHERING:
+                 mWifiApEnabler.setSoftapEnabled(true);
+                 break;
+-            case BLUETOOTH_TETHERING:
+-                // turn on Bluetooth first
+-                BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+-                if (adapter.getState() == BluetoothAdapter.STATE_OFF) {
+-                    mBluetoothEnableForTether = true;
+-                    adapter.enable();
+-                    mBluetoothTether.setSummary(R.string.bluetooth_turning_on);
+-                    mBluetoothTether.setEnabled(false);
+-                } else {
+-                    mBluetoothPan.setBluetoothTethering(true);
+-                    mBluetoothTether.setSummary(R.string.bluetooth_tethering_available_subtext);
+-                }
+-                break;
+             case USB_TETHERING:
+                 setUsbTethering(true);
+                 break;
+@@ -562,28 +441,6 @@ public class TetherSettings extends SettingsPreferenceFragment
+             } else {
+                 setUsbTethering(newState);
+             }
+-        } else if (preference == mBluetoothTether) {
+-            boolean bluetoothTetherState = mBluetoothTether.isChecked();
+-
+-            if (bluetoothTetherState) {
+-                startProvisioningIfNecessary(BLUETOOTH_TETHERING);
+-            } else {
+-                boolean errored = false;
+-
+-                String [] tethered = cm.getTetheredIfaces();
+-                String bluetoothIface = findIface(tethered, mBluetoothRegexs);
+-                if (bluetoothIface != null &&
+-                        cm.untether(bluetoothIface) != ConnectivityManager.TETHER_ERROR_NO_ERROR) {
+-                    errored = true;
+-                }
+-
+-                mBluetoothPan.setBluetoothTethering(false);
+-                if (errored) {
+-                    mBluetoothTether.setSummary(R.string.bluetooth_tethering_errored_subtext);
+-                } else {
+-                    mBluetoothTether.setSummary(R.string.bluetooth_tethering_off_subtext);
+-                }
+-            }
+         } else if (preference == mTetherHelp) {
+             showDialog(DIALOG_TETHER_HELP);
+             return true;
+diff --git a/src/com/android/settings/Utils.java b/src/com/android/settings/Utils.java
+index f28500e..7bbfe9f 100644
+--- a/src/com/android/settings/Utils.java
++++ b/src/com/android/settings/Utils.java
+@@ -419,26 +419,18 @@ public class Utils {
+     public static int getTetheringLabel(ConnectivityManager cm) {
+         String[] usbRegexs = cm.getTetherableUsbRegexs();
+         String[] wifiRegexs = cm.getTetherableWifiRegexs();
+-        String[] bluetoothRegexs = cm.getTetherableBluetoothRegexs();
+ 
+         boolean usbAvailable = usbRegexs.length != 0;
+         boolean wifiAvailable = wifiRegexs.length != 0;
+-        boolean bluetoothAvailable = bluetoothRegexs.length != 0;
+ 
+-        if (wifiAvailable && usbAvailable && bluetoothAvailable) {
++        if (wifiAvailable && usbAvailable) {
+             return R.string.tether_settings_title_all;
+         } else if (wifiAvailable && usbAvailable) {
+             return R.string.tether_settings_title_all;
+-        } else if (wifiAvailable && bluetoothAvailable) {
+-            return R.string.tether_settings_title_all;
+         } else if (wifiAvailable) {
+             return R.string.tether_settings_title_wifi;
+-        } else if (usbAvailable && bluetoothAvailable) {
+-            return R.string.tether_settings_title_usb_bluetooth;
+-        } else if (usbAvailable) {
+-            return R.string.tether_settings_title_usb;
+         } else {
+-            return R.string.tether_settings_title_bluetooth;
+-        }
++            return R.string.tether_settings_title_usb;
++	}
+     }
+ }
+diff --git a/src/com/android/settings/WirelessSettings.java b/src/com/android/settings/WirelessSettings.java
+index 13f6902..ca6e91c 100644
+--- a/src/com/android/settings/WirelessSettings.java
++++ b/src/com/android/settings/WirelessSettings.java
+@@ -37,7 +37,6 @@ import android.widget.Switch;
+ import com.android.internal.telephony.TelephonyIntents;
+ import com.android.internal.telephony.TelephonyProperties;
+ import com.android.settings.nfc.NfcEnabler;
+-import com.android.settings.wifi.p2p.WifiP2pEnabler;
+ 
+ public class WirelessSettings extends SettingsPreferenceFragment {
+ 
+@@ -60,8 +59,6 @@ public class WirelessSettings extends SettingsPreferenceFragment {
+     private NfcEnabler mNfcEnabler;
+     private NfcAdapter mNfcAdapter;
+ 
+-    private WifiP2pEnabler mWifiP2pEnabler;
+-
+     /**
+      * Invoked on each preference click in this hierarchy, overrides
+      * PreferenceActivity's implementation.  Used to make sure we track the
+@@ -128,12 +125,12 @@ public class WirelessSettings extends SettingsPreferenceFragment {
+         if (toggleable == null || !toggleable.contains(Settings.System.RADIO_WIFI)) {
+             findPreference(KEY_VPN_SETTINGS).setDependency(KEY_TOGGLE_AIRPLANE);
+         }
+-
++/*
+         // Manually set dependencies for Bluetooth when not toggleable.
+         if (toggleable == null || !toggleable.contains(Settings.System.RADIO_BLUETOOTH)) {
+             // No bluetooth-dependent items in the list. Code kept in case one is added later.
+         }
+-
++*/
+         // Manually set dependencies for NFC when not toggleable.
+         if (toggleable == null || !toggleable.contains(Settings.System.RADIO_NFC)) {
+             findPreference(KEY_TOGGLE_NFC).setDependency(KEY_TOGGLE_AIRPLANE);
+@@ -153,15 +150,6 @@ public class WirelessSettings extends SettingsPreferenceFragment {
+             getPreferenceScreen().removePreference(findPreference(KEY_MOBILE_NETWORK_SETTINGS));
+         }
+ 
+-        WifiP2pManager p2p = (WifiP2pManager) activity.getSystemService(Context.WIFI_P2P_SERVICE);
+-
+-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)) {
+-            getPreferenceScreen().removePreference(wifiP2p);
+-        } else {
+-            mWifiP2pEnabler = new WifiP2pEnabler(activity, wifiP2p);
+-        }
+-        getPreferenceScreen().removePreference(findPreference(KEY_WIFI_P2P_SETTINGS));
+-
+         // Enable Proxy selector settings if allowed.
+         Preference mGlobalProxy = findPreference(KEY_PROXY_SETTINGS);
+         DevicePolicyManager mDPM = (DevicePolicyManager)
+@@ -189,10 +177,6 @@ public class WirelessSettings extends SettingsPreferenceFragment {
+         if (mNfcEnabler != null) {
+             mNfcEnabler.resume();
+         }
+-
+-        if (mWifiP2pEnabler != null) {
+-            mWifiP2pEnabler.resume();
+-        }
+     }
+ 
+     @Override
+@@ -203,10 +187,6 @@ public class WirelessSettings extends SettingsPreferenceFragment {
+         if (mNfcEnabler != null) {
+             mNfcEnabler.pause();
+         }
+-
+-        if (mWifiP2pEnabler != null) {
+-            mWifiP2pEnabler.pause();
+-        }
+     }
+ 
+     @Override
+diff --git a/src/com/android/settings/wifi/p2p/WifiP2pDialog.java b/src/com/android/settings/wifi/p2p/WifiP2pDialog.java
+deleted file mode 100644
+index e688905..0000000
+--- a/src/com/android/settings/wifi/p2p/WifiP2pDialog.java
++++ /dev/null
+@@ -1,132 +0,0 @@
+-/*
+- * Copyright (C) 2011 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.settings.wifi.p2p;
+-
+-import android.app.AlertDialog;
+-import android.content.Context;
+-import android.content.DialogInterface;
+-import android.net.wifi.WpsInfo;
+-import android.net.wifi.p2p.WifiP2pConfig;
+-import android.net.wifi.p2p.WifiP2pDevice;
+-import android.os.Bundle;
+-import android.view.View;
+-import android.widget.AdapterView;
+-import android.widget.CheckBox;
+-import android.widget.Spinner;
+-import android.widget.TextView;
+-
+-import com.android.settings.R;
+-
+-/**
+- * Dialog to setup a p2p connection
+- */
+-public class WifiP2pDialog extends AlertDialog implements AdapterView.OnItemSelectedListener {
+-
+-    static final int BUTTON_SUBMIT = DialogInterface.BUTTON_POSITIVE;
+-
+-    private final DialogInterface.OnClickListener mListener;
+-
+-    private View mView;
+-    private TextView mDeviceName;
+-    private TextView mDeviceAddress;
+-
+-    /* These values come from "wifi_p2p_wps_setup" resource array */
+-    private static final int WPS_PBC = 0;
+-    private static final int WPS_KEYPAD = 1;
+-    private static final int WPS_DISPLAY = 2;
+-
+-    private int mWpsSetupIndex = WPS_PBC; //default is pbc
+-
+-    WifiP2pDevice mDevice;
+-
+-    public WifiP2pDialog(Context context, DialogInterface.OnClickListener listener,
+-            WifiP2pDevice device) {
+-        super(context);
+-        mListener = listener;
+-        mDevice = device;
+-    }
+-
+-    public WifiP2pConfig getConfig() {
+-        WifiP2pConfig config = new WifiP2pConfig();
+-        config.deviceAddress = mDeviceAddress.getText().toString();
+-        config.wps = new WpsInfo();
+-        switch (mWpsSetupIndex) {
+-            case WPS_PBC:
+-                config.wps.setup = WpsInfo.PBC;
+-                break;
+-            case WPS_KEYPAD:
+-                config.wps.setup = WpsInfo.KEYPAD;
+-                config.wps.pin = ((TextView) mView.findViewById(R.id.wps_pin)).
+-                        getText().toString();
+-                break;
+-            case WPS_DISPLAY:
+-                config.wps.setup = WpsInfo.DISPLAY;
+-                break;
+-            default:
+-                config.wps.setup = WpsInfo.PBC;
+-                break;
+-        }
+-        return config;
+-    }
+-
+-    @Override
+-    protected void onCreate(Bundle savedInstanceState) {
+-
+-        mView = getLayoutInflater().inflate(R.layout.wifi_p2p_dialog, null);
+-        Spinner mWpsSetup = ((Spinner) mView.findViewById(R.id.wps_setup));
+-
+-        setView(mView);
+-        setInverseBackgroundForced(true);
+-
+-        Context context = getContext();
+-
+-        setTitle(R.string.wifi_p2p_settings_title);
+-        mDeviceName = (TextView) mView.findViewById(R.id.device_name);
+-        mDeviceAddress = (TextView) mView.findViewById(R.id.device_address);
+-
+-        setButton(BUTTON_SUBMIT, context.getString(R.string.wifi_connect), mListener);
+-        setButton(DialogInterface.BUTTON_NEGATIVE,
+-                    context.getString(R.string.wifi_cancel), mListener);
+-
+-        if (mDevice != null) {
+-            mDeviceName.setText(mDevice.deviceName);
+-            mDeviceAddress.setText(mDevice.deviceAddress);
+-            mWpsSetup.setSelection(mWpsSetupIndex); //keep pbc as default
+-       }
+-
+-        mWpsSetup.setOnItemSelectedListener(this);
+-
+-        super.onCreate(savedInstanceState);
+-    }
+-
+-    @Override
+-    public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+-        mWpsSetupIndex = position;
+-
+-        if (mWpsSetupIndex == WPS_KEYPAD) {
+-            mView.findViewById(R.id.wps_pin_entry).setVisibility(View.VISIBLE);
+-        } else {
+-            mView.findViewById(R.id.wps_pin_entry).setVisibility(View.GONE);
+-        }
+-        return;
+-    }
+-
+-    @Override
+-    public void onNothingSelected(AdapterView<?> parent) {
+-    }
+-
+-}
+diff --git a/src/com/android/settings/wifi/p2p/WifiP2pEnabler.java b/src/com/android/settings/wifi/p2p/WifiP2pEnabler.java
+deleted file mode 100644
+index 0747d64..0000000
+--- a/src/com/android/settings/wifi/p2p/WifiP2pEnabler.java
++++ /dev/null
+@@ -1,117 +0,0 @@
+-/*
+- * Copyright (C) 2011 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.settings.wifi.p2p;
+-
+-import com.android.settings.R;
+-
+-import android.content.BroadcastReceiver;
+-import android.content.Context;
+-import android.content.Intent;
+-import android.content.IntentFilter;
+-import android.net.wifi.p2p.WifiP2pManager;
+-import android.os.Message;
+-import android.preference.CheckBoxPreference;
+-import android.preference.Preference;
+-import android.provider.Settings;
+-import android.util.Log;
+-
+-/**
+- * WifiP2pEnabler is a helper to manage the Wifi p2p on/off
+- */
+-public class WifiP2pEnabler implements Preference.OnPreferenceChangeListener {
+-    private static final String TAG = "WifiP2pEnabler";
+-
+-    private final Context mContext;
+-    private final CheckBoxPreference mCheckBox;
+-    private final IntentFilter mIntentFilter;
+-    private WifiP2pManager mWifiP2pManager;
+-    private WifiP2pManager.Channel mChannel;
+-
+-    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+-        @Override
+-        public void onReceive(Context context, Intent intent) {
+-            String action = intent.getAction();
+-
+-            if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
+-                handleP2pStateChanged(intent.getIntExtra(
+-                        WifiP2pManager.EXTRA_WIFI_STATE, WifiP2pManager.WIFI_P2P_STATE_DISABLED));
+-            }
+-        }
+-    };
+-
+-    public WifiP2pEnabler(Context context, CheckBoxPreference checkBox) {
+-        mContext = context;
+-        mCheckBox = checkBox;
+-
+-        mWifiP2pManager = (WifiP2pManager) context.getSystemService(Context.WIFI_P2P_SERVICE);
+-        if (mWifiP2pManager != null) {
+-            mChannel = mWifiP2pManager.initialize(mContext, mContext.getMainLooper(), null);
+-            if (mChannel == null) {
+-                //Failure to set up connection
+-                Log.e(TAG, "Failed to set up connection with wifi p2p service");
+-                mWifiP2pManager = null;
+-                mCheckBox.setEnabled(false);
+-            }
+-        } else {
+-            Log.e(TAG, "mWifiP2pManager is null!");
+-        }
+-        mIntentFilter = new IntentFilter(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
+-
+-    }
+-
+-    public void resume() {
+-        if (mWifiP2pManager == null) return;
+-        mContext.registerReceiver(mReceiver, mIntentFilter);
+-        mCheckBox.setOnPreferenceChangeListener(this);
+-    }
+-
+-    public void pause() {
+-        if (mWifiP2pManager == null) return;
+-        mContext.unregisterReceiver(mReceiver);
+-        mCheckBox.setOnPreferenceChangeListener(null);
+-    }
+-
+-    public boolean onPreferenceChange(Preference preference, Object value) {
+-
+-        if (mWifiP2pManager == null) return false;
+-
+-        mCheckBox.setEnabled(false);
+-        final boolean enable = (Boolean) value;
+-        if (enable) {
+-            mWifiP2pManager.enableP2p(mChannel);
+-        } else {
+-            mWifiP2pManager.disableP2p(mChannel);
+-        }
+-        return false;
+-    }
+-
+-    private void handleP2pStateChanged(int state) {
+-        mCheckBox.setEnabled(true);
+-        switch (state) {
+-            case WifiP2pManager.WIFI_P2P_STATE_ENABLED:
+-                mCheckBox.setChecked(true);
+-                break;
+-            case WifiP2pManager.WIFI_P2P_STATE_DISABLED:
+-                mCheckBox.setChecked(false);
+-                break;
+-            default:
+-                Log.e(TAG,"Unhandled wifi state " + state);
+-                break;
+-        }
+-    }
+-
+-}
+diff --git a/src/com/android/settings/wifi/p2p/WifiP2pPeer.java b/src/com/android/settings/wifi/p2p/WifiP2pPeer.java
+deleted file mode 100644
+index 1eb810e..0000000
+--- a/src/com/android/settings/wifi/p2p/WifiP2pPeer.java
++++ /dev/null
+@@ -1,103 +0,0 @@
+-/*
+- * Copyright (C) 2011 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.settings.wifi.p2p;
+-
+-import com.android.settings.R;
+-
+-import android.content.Context;
+-import android.net.wifi.WifiManager;
+-import android.net.wifi.p2p.WifiP2pManager;
+-import android.net.wifi.p2p.WifiP2pDevice;
+-import android.preference.Preference;
+-import android.text.TextUtils;
+-import android.view.View;
+-import android.widget.ImageView;
+-
+-import java.util.Comparator;
+-
+-public class WifiP2pPeer extends Preference {
+-
+-    private static final int[] STATE_SECURED = {R.attr.state_encrypted};
+-    public WifiP2pDevice device;
+-
+-    private int mRssi;
+-    private ImageView mSignal;
+-
+-    private static final int SIGNAL_LEVELS = 4;
+-
+-    public WifiP2pPeer(Context context, WifiP2pDevice dev) {
+-        super(context);
+-        device = dev;
+-        setWidgetLayoutResource(R.layout.preference_widget_wifi_signal);
+-        mRssi = 60; //TODO: fix
+-    }
+-
+-    @Override
+-    protected void onBindView(View view) {
+-        if (TextUtils.isEmpty(device.deviceName)) {
+-            setTitle(device.deviceAddress);
+-        } else {
+-            setTitle(device.deviceName);
+-        }
+-        mSignal = (ImageView) view.findViewById(R.id.signal);
+-        if (mRssi == Integer.MAX_VALUE) {
+-            mSignal.setImageDrawable(null);
+-        } else {
+-            mSignal.setImageResource(R.drawable.wifi_signal);
+-            mSignal.setImageState(STATE_SECURED,  true);
+-        }
+-        refresh();
+-        super.onBindView(view);
+-    }
+-
+-    @Override
+-    public int compareTo(Preference preference) {
+-        if (!(preference instanceof WifiP2pPeer)) {
+-            return 1;
+-        }
+-        WifiP2pPeer other = (WifiP2pPeer) preference;
+-
+-        // devices go in the order of the status
+-        if (device.status != other.device.status) {
+-            return device.status < other.device.status ? -1 : 1;
+-        }
+-
+-        // Sort by name/address
+-        if (device.deviceName != null) {
+-            return device.deviceName.compareToIgnoreCase(other.device.deviceName);
+-        }
+-
+-        return device.deviceAddress.compareToIgnoreCase(other.device.deviceAddress);
+-    }
+-
+-    int getLevel() {
+-        if (mRssi == Integer.MAX_VALUE) {
+-            return -1;
+-        }
+-        return WifiManager.calculateSignalLevel(mRssi, SIGNAL_LEVELS);
+-    }
+-
+-    private void refresh() {
+-        if (mSignal == null) {
+-            return;
+-        }
+-        Context context = getContext();
+-        mSignal.setImageLevel(getLevel());
+-        String[] statusArray = context.getResources().getStringArray(R.array.wifi_p2p_status);
+-        setSummary(statusArray[device.status]);
+-    }
+-}
+diff --git a/src/com/android/settings/wifi/p2p/WifiP2pSettings.java b/src/com/android/settings/wifi/p2p/WifiP2pSettings.java
+deleted file mode 100644
+index f6588b9..0000000
+--- a/src/com/android/settings/wifi/p2p/WifiP2pSettings.java
++++ /dev/null
+@@ -1,337 +0,0 @@
+-/*
+- * Copyright (C) 2011 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package com.android.settings.wifi.p2p;
+-
+-import android.app.ActionBar;
+-import android.app.Activity;
+-import android.app.AlertDialog;
+-import android.app.Dialog;
+-import android.content.BroadcastReceiver;
+-import android.content.Context;
+-import android.content.DialogInterface;
+-import android.content.DialogInterface.OnClickListener;
+-import android.content.Intent;
+-import android.content.IntentFilter;
+-import android.net.NetworkInfo;
+-import android.net.wifi.p2p.WifiP2pConfig;
+-import android.net.wifi.p2p.WifiP2pDevice;
+-import android.net.wifi.p2p.WifiP2pDeviceList;
+-import android.net.wifi.p2p.WifiP2pManager;
+-import android.net.wifi.p2p.WifiP2pManager.PeerListListener;
+-import android.os.Bundle;
+-import android.os.Message;
+-import android.preference.Preference;
+-import android.preference.PreferenceActivity;
+-import android.preference.PreferenceCategory;
+-import android.preference.PreferenceGroup;
+-import android.preference.PreferenceScreen;
+-import android.text.TextUtils;
+-import android.util.Log;
+-import android.view.Gravity;
+-import android.view.Menu;
+-import android.view.MenuInflater;
+-import android.view.MenuItem;
+-
+-import com.android.settings.R;
+-import com.android.settings.SettingsPreferenceFragment;
+-
+-import java.util.Arrays;
+-import java.util.List;
+-import java.util.Collection;
+-
+-/*
+- * Displays Wi-fi p2p settings UI
+- */
+-public class WifiP2pSettings extends SettingsPreferenceFragment
+-        implements PeerListListener {
+-
+-    private static final String TAG = "WifiP2pSettings";
+-    private static final int MENU_ID_SEARCH = Menu.FIRST;
+-    private static final int MENU_ID_CREATE_GROUP = Menu.FIRST + 1;
+-    private static final int MENU_ID_REMOVE_GROUP = Menu.FIRST + 2;
+-    private static final int MENU_ID_ADVANCED = Menu.FIRST +3;
+-
+-
+-    private final IntentFilter mIntentFilter = new IntentFilter();
+-    private WifiP2pManager mWifiP2pManager;
+-    private WifiP2pManager.Channel mChannel;
+-    private WifiP2pDialog mConnectDialog;
+-    private OnClickListener mConnectListener;
+-    private OnClickListener mDisconnectListener;
+-    private WifiP2pPeer mSelectedWifiPeer;
+-
+-    private PreferenceGroup mPeersGroup;
+-    private Preference mThisDevicePref;
+-
+-    private static final int DIALOG_CONNECT     = 1;
+-    private static final int DIALOG_DISCONNECT  = 2;
+-
+-    private WifiP2pDevice mThisDevice;
+-    private WifiP2pDeviceList mPeers = new WifiP2pDeviceList();
+-
+-    private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
+-        @Override
+-        public void onReceive(Context context, Intent intent) {
+-            String action = intent.getAction();
+-
+-            if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
+-                //TODO: nothing right now
+-            } else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
+-                if (mWifiP2pManager != null) {
+-                    mWifiP2pManager.requestPeers(mChannel, WifiP2pSettings.this);
+-                }
+-            } else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
+-                if (mWifiP2pManager == null) return;
+-                NetworkInfo networkInfo = (NetworkInfo) intent.getParcelableExtra(
+-                        WifiP2pManager.EXTRA_NETWORK_INFO);
+-                if (networkInfo.isConnected()) {
+-                    Log.d(TAG, "Connected");
+-                }
+-            } else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {
+-                mThisDevice = (WifiP2pDevice) intent.getParcelableExtra(
+-                        WifiP2pManager.EXTRA_WIFI_P2P_DEVICE);
+-                Log.d(TAG, "Update device info: " + mThisDevice);
+-                updateDevicePref();
+-            }
+-        }
+-    };
+-
+-    @Override
+-    public void onCreate(Bundle icicle) {
+-        super.onCreate(icicle);
+-        addPreferencesFromResource(R.xml.wifi_p2p_settings);
+-
+-        mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
+-        mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
+-        mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
+-        mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
+-
+-        final Activity activity = getActivity();
+-        mWifiP2pManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
+-        if (mWifiP2pManager != null) {
+-            mChannel = mWifiP2pManager.initialize(activity, getActivity().getMainLooper(), null);
+-            if (mChannel == null) {
+-                //Failure to set up connection
+-                Log.e(TAG, "Failed to set up connection with wifi p2p service");
+-                mWifiP2pManager = null;
+-            }
+-        } else {
+-            Log.e(TAG, "mWifiP2pManager is null !");
+-        }
+-
+-        //connect dialog listener
+-        mConnectListener = new OnClickListener() {
+-            @Override
+-            public void onClick(DialogInterface dialog, int which) {
+-                if (which == DialogInterface.BUTTON_POSITIVE) {
+-                    WifiP2pConfig config = mConnectDialog.getConfig();
+-                    if (mWifiP2pManager != null) {
+-                        mWifiP2pManager.connect(mChannel, config,
+-                                new WifiP2pManager.ActionListener() {
+-                            public void onSuccess() {
+-                                Log.d(TAG, " connect success");
+-                            }
+-                            public void onFailure(int reason) {
+-                                Log.d(TAG, " connect fail " + reason);
+-                            }
+-                        });
+-                    }
+-                }
+-            }
+-        };
+-
+-        //disconnect dialog listener
+-        mDisconnectListener = new OnClickListener() {
+-            @Override
+-            public void onClick(DialogInterface dialog, int which) {
+-                if (which == DialogInterface.BUTTON_POSITIVE) {
+-                    if (mWifiP2pManager != null) {
+-                        mWifiP2pManager.removeGroup(mChannel, new WifiP2pManager.ActionListener() {
+-                            public void onSuccess() {
+-                                Log.d(TAG, " remove group success");
+-                            }
+-                            public void onFailure(int reason) {
+-                                Log.d(TAG, " remove group fail " + reason);
+-                            }
+-                        });
+-                    }
+-                }
+-            }
+-        };
+-        setHasOptionsMenu(true);
+-    }
+-
+-    @Override
+-    public void onResume() {
+-        super.onResume();
+-        getActivity().registerReceiver(mReceiver, mIntentFilter);
+-
+-        if (mWifiP2pManager != null) {
+-            mWifiP2pManager.discoverPeers(mChannel, new WifiP2pManager.ActionListener() {
+-                            public void onSuccess() {
+-                                Log.d(TAG, " discover success");
+-                            }
+-                            public void onFailure(int reason) {
+-                                Log.d(TAG, " discover fail " + reason);
+-                            }
+-                        });
+-        }
+-    }
+-
+-    @Override
+-    public void onPause() {
+-        super.onPause();
+-        getActivity().unregisterReceiver(mReceiver);
+-    }
+-
+-    @Override
+-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+-        menu.add(Menu.NONE, MENU_ID_SEARCH, 0, R.string.wifi_p2p_menu_search)
+-            .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+-        menu.add(Menu.NONE, MENU_ID_CREATE_GROUP, 0, R.string.wifi_p2p_menu_create_group)
+-            .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+-        menu.add(Menu.NONE, MENU_ID_REMOVE_GROUP, 0, R.string.wifi_p2p_menu_remove_group)
+-            .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+-        menu.add(Menu.NONE, MENU_ID_ADVANCED, 0, R.string.wifi_p2p_menu_advanced)
+-            .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+-        super.onCreateOptionsMenu(menu, inflater);
+-    }
+-
+-    @Override
+-    public boolean onOptionsItemSelected(MenuItem item) {
+-        switch (item.getItemId()) {
+-            case MENU_ID_SEARCH:
+-                if (mWifiP2pManager != null) {
+-                    mWifiP2pManager.discoverPeers(mChannel, new WifiP2pManager.ActionListener() {
+-                            public void onSuccess() {
+-                                Log.d(TAG, " discover success");
+-                            }
+-                            public void onFailure(int reason) {
+-                                Log.d(TAG, " discover fail " + reason);
+-                            }
+-                        });
+-                }
+-                return true;
+-            case MENU_ID_CREATE_GROUP:
+-                if (mWifiP2pManager != null) {
+-                    mWifiP2pManager.createGroup(mChannel, new WifiP2pManager.ActionListener() {
+-                            public void onSuccess() {
+-                                Log.d(TAG, " create group success");
+-                            }
+-                            public void onFailure(int reason) {
+-                                Log.d(TAG, " create group fail " + reason);
+-                            }
+-                        });
+-                }
+-                return true;
+-            case MENU_ID_REMOVE_GROUP:
+-                if (mWifiP2pManager != null) {
+-                    mWifiP2pManager.removeGroup(mChannel, new WifiP2pManager.ActionListener() {
+-                            public void onSuccess() {
+-                                Log.d(TAG, " remove group success");
+-                            }
+-                            public void onFailure(int reason) {
+-                                Log.d(TAG, " remove group fail " + reason);
+-                            }
+-                        });
+-                }
+-                return true;
+-            case MENU_ID_ADVANCED:
+-                //TODO: add advanced settings for p2p
+-                return true;
+-        }
+-        return super.onOptionsItemSelected(item);
+-    }
+-
+-    @Override
+-    public boolean onPreferenceTreeClick(PreferenceScreen screen, Preference preference) {
+-        if (preference instanceof WifiP2pPeer) {
+-            mSelectedWifiPeer = (WifiP2pPeer) preference;
+-            if (mSelectedWifiPeer.device.status == WifiP2pDevice.CONNECTED) {
+-                showDialog(DIALOG_DISCONNECT);
+-            } else {
+-                showDialog(DIALOG_CONNECT);
+-            }
+-        }
+-        return super.onPreferenceTreeClick(screen, preference);
+-    }
+-
+-    @Override
+-    public Dialog onCreateDialog(int id) {
+-        if (id == DIALOG_CONNECT) {
+-            mConnectDialog = new WifiP2pDialog(getActivity(), mConnectListener,
+-                mSelectedWifiPeer.device);
+-            return mConnectDialog;
+-        } else if (id == DIALOG_DISCONNECT) {
+-            AlertDialog dialog = new AlertDialog.Builder(getActivity())
+-                .setTitle("Disconnect ?")
+-                .setMessage("Do you want to disconnect ?")
+-                .setPositiveButton(getActivity().getString(R.string.dlg_ok), mDisconnectListener)
+-                .setNegativeButton(getActivity().getString(R.string.dlg_cancel), null)
+-                .create();
+-            return dialog;
+-        }
+-        return null;
+-    }
+-
+-    public void onPeersAvailable(WifiP2pDeviceList peers) {
+-
+-        final PreferenceScreen preferenceScreen = getPreferenceScreen();
+-        preferenceScreen.removeAll();
+-
+-        preferenceScreen.setOrderingAsAdded(true);
+-
+-        if (mPeersGroup == null) {
+-            mPeersGroup = new PreferenceCategory(getActivity());
+-        } else {
+-            mPeersGroup.removeAll();
+-        }
+-
+-        preferenceScreen.addPreference(mThisDevicePref);
+-
+-        mPeersGroup.setTitle(R.string.wifi_p2p_available_devices);
+-        mPeersGroup.setEnabled(true);
+-        preferenceScreen.addPreference(mPeersGroup);
+-
+-        mPeers = peers;
+-        for (WifiP2pDevice peer: peers.getDeviceList()) {
+-            mPeersGroup.addPreference(new WifiP2pPeer(getActivity(), peer));
+-        }
+-    }
+-
+-    private void updateDevicePref() {
+-        mThisDevicePref = new Preference(getActivity());
+-
+-        if (mThisDevice != null) {
+-            if (TextUtils.isEmpty(mThisDevice.deviceName)) {
+-                mThisDevicePref.setTitle(mThisDevice.deviceAddress);
+-            } else {
+-                mThisDevicePref.setTitle(mThisDevice.deviceName);
+-            }
+-
+-            if (mThisDevice.status == WifiP2pDevice.CONNECTED) {
+-                String[] statusArray = getActivity().getResources().getStringArray(
+-                        R.array.wifi_p2p_status);
+-                mThisDevicePref.setSummary(statusArray[mThisDevice.status]);
+-            }
+-            mThisDevicePref.setPersistent(false);
+-            mThisDevicePref.setEnabled(true);
+-            mThisDevicePref.setSelectable(false);
+-        }
+-        onPeersAvailable(mPeers); //update UI
+-    }
+-}
+-- 
+1.8.3.2
+
