@@ -1,0 +1,28 @@
+From 430ff946a16f21d996113ee8511ba13ece91a7ef Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Wed, 25 Jun 2014 21:41:58 +0200
+Subject: [PATCH] Add ARMv6 webkit support
+
+---
+ Android.mk | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Android.mk b/Android.mk
+index 623a35f..755f51d 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -67,9 +67,9 @@ ifneq ($(JAVASCRIPT_ENGINE),jsc)
+   endif
+ endif
+ 
+-# V8 also requires an ARMv7 CPU, and since we must use jsc, we cannot
++# V8 also requires a VFP CPU, and since we must use jsc, we cannot
+ # use the Chrome http stack either.
+-ifneq ($(strip $(ARCH_ARM_HAVE_ARMV7A)),true)
++ifneq ($(strip $(ARCH_ARM_HAVE_VFP)),true)
+   JAVASCRIPT_ENGINE := jsc
+   USE_ALT_HTTP := true
+ endif
+-- 
+1.8.3.2
+
