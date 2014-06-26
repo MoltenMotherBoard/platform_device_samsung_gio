@@ -1,0 +1,281 @@
+From 1df94042e73996276a0d7ef16e8bbbdf7c798ad6 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Wed, 25 Jun 2014 22:54:27 +0200
+Subject: [PATCH] Unified netd patch [*]Fix WPA2 AP    Reference:   
+ http://server.cas-online.nl:8181/#/c/835/1/SoftapController.cpp,unified
+ [*]system/netd: fix hotspot using legacy hostapd binaries    Two changes:   
+ 1. Modify SoftapController::startDriver function to ensure that the   
+ wireless interface is initialized before attempting to start the interface.  
+  This may only be needed for the ar6000 driver (which needs the interface   
+ up to be able to function).    2. Add a new BoardConfig option to improve
+ compatibility with older    (v0.6 or earlier) hostapd binaries. Activate
+ with:    BOARD_HAVE_LEGACY_HOSTAPD := true [*]SoftAP: allow a hostapd service
+ and handle the wifi channel    (using command parameters, or the new property
+ "wifi.ap.channel")
+
+---
+ Android.mk           |   8 ++++
+ SoftapController.cpp | 109 ++++++++++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 102 insertions(+), 15 deletions(-)
+
+diff --git a/Android.mk b/Android.mk
+index c09b634..c16cf2e 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -44,6 +44,10 @@ else
+     LOCAL_SRC_FILES += SoftapController.cpp
+ endif
+ 
++ifneq ($(BOARD_HAVE_LEGACY_HOSTAPD),)
++  LOCAL_CFLAGS +=-DHAVE_HOSTAPD
++  LOCAL_CFLAGS +=-DHAVE_LEGACY_HOSTAPD
++endif
+ 
+ ifneq ($(BOARD_HOSTAPD_DRIVER),)
+   LOCAL_CFLAGS += -DHAVE_HOSTAPD
+@@ -52,6 +56,10 @@ ifneq ($(BOARD_HOSTAPD_DRIVER),)
+   endif
+ endif
+ 
++ifneq ($(BOARD_HOSTAPD_SERVICE_NAME),)
++  LOCAL_CFLAGS += -DHOSTAPD_SERVICE_NAME=\"$(BOARD_HOSTAPD_SERVICE_NAME)\"
++endif
++
+ ifneq ($(BOARD_HOSTAPD_NO_ENTROPY),)
+   LOCAL_CFLAGS += -DHOSTAPD_NO_ENTROPY
+ endif
+diff --git a/SoftapController.cpp b/SoftapController.cpp
+index 820811f..d121f3a 100644
+--- a/SoftapController.cpp
++++ b/SoftapController.cpp
+@@ -35,6 +35,7 @@
+ 
+ #define LOG_TAG "SoftapController"
+ #include <cutils/log.h>
++#include <cutils/properties.h>
+ #include <netutils/ifc.h>
+ #include <private/android_filesystem_config.h>
+ #include "wifi.h"
+@@ -45,8 +46,13 @@
+ #define HOSTAPD_DRIVER_NAME "nl80211"
+ #endif
+ 
++#define AP_DEFAULT_CHANNEL 5
++#define AP_SOCKET_PATH "/data/misc/wifi/hostapd"
++
+ static const char HOSTAPD_CONF_FILE[]    = "/data/misc/wifi/hostapd.conf";
+ 
++extern "C" int system_nosh(const char *command);
++
+ SoftapController::SoftapController() {
+     mPid = 0;
+     mSock = socket(AF_INET, SOCK_DGRAM, 0);
+@@ -122,6 +128,12 @@ int SoftapController::setCommand(char *iface, const char *fname, unsigned buflen
+ int SoftapController::startDriver(char *iface) {
+     int ret;
+ 
++#ifdef HAVE_HOSTAPD
++    ifc_init();
++    ret = ifc_up(iface);
++    ifc_close();
++#endif
++
+     if (mSock < 0) {
+         LOGE("Softap driver start - failed to open socket");
+         return -1;
+@@ -141,11 +153,6 @@ int SoftapController::startDriver(char *iface) {
+         LOGE("Softap driver start: %d", ret);
+         return ret;
+     }
+-#ifdef HAVE_HOSTAPD
+-    ifc_init();
+-    ret = ifc_up(iface);
+-    ifc_close();
+-#endif
+     usleep(AP_DRIVER_START_DELAY);
+     LOGD("Softap driver start: %d", ret);
+     return ret;
+@@ -183,6 +190,7 @@ int SoftapController::stopDriver(char *iface) {
+ int SoftapController::startSoftap() {
+     pid_t pid = 1;
+     int ret = 0;
++    char value[PROPERTY_VALUE_MAX];
+ 
+     if (mPid) {
+         LOGE("Softap already started");
+@@ -192,6 +200,36 @@ int SoftapController::startSoftap() {
+         LOGE("Softap startap - failed to open socket");
+         return -1;
+     }
++#ifdef HOSTAPD_SERVICE_NAME
++
++#ifndef HOSTAPD_NO_ENTROPY
++    ensure_entropy_file_exists();
++#endif
++    ret = system_nosh("/system/bin/start " HOSTAPD_SERVICE_NAME);
++    pid = (ret == 0);
++
++    usleep(AP_BSS_START_DELAY);
++    property_get("init.svc." HOSTAPD_SERVICE_NAME, value, "stopped");
++    if (strcmp(value, "running") == 0) {
++        LOGD("hostapd service started");
++    } else {
++        ret = -1;
++    }
++
++    *mBuf = 0;
++    ret = setCommand(mIface, "AP_BSS_START");
++    if (ret) {
++        LOGE("Softap startap - failed: %d", ret);
++    }
++    else {
++        mPid = pid;
++        LOGD("Softap started");
++        usleep(AP_BSS_START_DELAY);
++    }
++
++    return ret;
++#else
++
+ #ifdef HAVE_HOSTAPD
+     if ((pid = fork()) < 0) {
+         LOGE("fork failed (%s)", strerror(errno));
+@@ -210,7 +248,7 @@ int SoftapController::startSoftap() {
+                   HOSTAPD_CONF_FILE, (char *) NULL)) {
+             LOGE("execl failed (%s)", strerror(errno));
+         }
+-#endif
++#endif /* HAVE_HOSTAPD */
+         LOGE("Should never get here!");
+         return -1;
+     } else {
+@@ -226,7 +264,7 @@ int SoftapController::startSoftap() {
+         }
+     }
+     return ret;
+-
++#endif /* HOSTAPD_SERVICE_NAME */
+ }
+ 
+ int SoftapController::stopSoftap() {
+@@ -237,6 +275,25 @@ int SoftapController::stopSoftap() {
+         return 0;
+     }
+ 
++#ifdef HOSTAPD_SERVICE_NAME
++    LOGD("Stopping hostapd service");
++    // use the hostapd service defined in init.rc
++    if (system_nosh("/system/bin/stop " HOSTAPD_SERVICE_NAME))
++    {
++        LOGE("stop failed (%s)", strerror(errno));
++    }
++    if (mSock < 0) {
++        LOGE("Softap stopap - failed to open socket");
++        return -1;
++    }
++    *mBuf = 0;
++    ret = setCommand(mIface, "AP_BSS_STOP");
++    mPid = 0;
++    LOGD("Softap service stopped: %d", ret);
++    usleep(AP_BSS_STOP_DELAY);
++    return ret;
++#else
++
+ #ifdef HAVE_HOSTAPD
+     LOGD("Stopping Softap service");
+     kill(mPid, SIGTERM);
+@@ -252,6 +309,7 @@ int SoftapController::stopSoftap() {
+     LOGD("Softap service stopped: %d", ret);
+     usleep(AP_BSS_STOP_DELAY);
+     return ret;
++#endif /* HOSTAPD_SERVICE_NAME */
+ }
+ 
+ bool SoftapController::isSoftapStarted() {
+@@ -284,7 +342,7 @@ int SoftapController::addParam(int pos, const char *cmd, const char *arg)
+ int SoftapController::setSoftap(int argc, char *argv[]) {
+     char psk_str[2*SHA256_DIGEST_LENGTH+1];
+     int ret = 0, i = 0, fd;
+-    char *ssid, *iface;
++    char *ssid;
+ 
+     if (mSock < 0) {
+         LOGE("Softap set - failed to open socket");
+@@ -296,11 +354,11 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
+     }
+ 
+     strncpy(mIface, argv[3], sizeof(mIface));
+-    iface = argv[2];
+ 
+ #ifdef HAVE_HOSTAPD
+     char *wbuf = NULL;
+     char *fbuf = NULL;
++    int channel = 0;
+ 
+     if (argc > 4) {
+         ssid = argv[4];
+@@ -308,18 +366,39 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
+         ssid = (char *)"AndroidAP";
+     }
+ 
+-    asprintf(&wbuf, "interface=%s\ndriver=" HOSTAPD_DRIVER_NAME "\nctrl_interface="
+-            "/data/misc/wifi/hostapd\nssid=%s\nchannel=6\n", iface, ssid);
++    if (argc > 7) {
++        channel = atoi(argv[7]);
++    } else {
++        char value[PROPERTY_VALUE_MAX];
++        property_get("wifi.ap.channel", value, "0");
++        channel = atoi(value);
++    }
++    if (channel == 0) {
++        channel = AP_DEFAULT_CHANNEL;
++        LOGV("No valid wifi channel specified, using default");
++    }
++
++#ifdef HAVE_LEGACY_HOSTAPD
++    asprintf(&wbuf, "interface=%s\nctrl_interface=" AP_SOCKET_PATH "\n"
++#else
++    asprintf(&wbuf, "interface=%s\ndriver=" HOSTAPD_DRIVER_NAME "\n"
++                    "ctrl_interface=" AP_SOCKET_PATH "\n"
++#endif
++                    "ssid=%s\nchannel=%d\n", mIface, ssid, channel);
++
++    LOGV("%s", wbuf);
+ 
+     if (argc > 5) {
+         if (!strcmp(argv[5], "wpa-psk")) {
+             generatePsk(ssid, argv[6], psk_str);
+             asprintf(&fbuf, "%swpa=1\nwpa_pairwise=TKIP CCMP\nwpa_psk=%s\n", wbuf, psk_str);
+-        } else if (!strcmp(argv[5], "wpa2-psk")) {
++        } else if (!strncmp(argv[5], "wpa2", 4)) {
+             generatePsk(ssid, argv[6], psk_str);
+-            asprintf(&fbuf, "%swpa=2\nrsn_pairwise=CCMP\nwpa_psk=%s\n", wbuf, psk_str);
++            asprintf(&fbuf, "%swpa=2\nwpa_pairwise=CCMP\nwpa_psk=%s\n", wbuf, psk_str);
+         } else if (!strcmp(argv[5], "open")) {
+             asprintf(&fbuf, "%s", wbuf);
++        } else {
++            LOGE("Invalid softap security type '%s'!\n", argv[5]);
+         }
+     } else {
+         asprintf(&fbuf, "%s", wbuf);
+@@ -397,7 +476,7 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
+     sprintf(&mBuf[i], "END");
+ 
+     /* system("iwpriv eth0 WL_AP_CFG ASCII_CMD=AP_CFG,SSID=\"AndroidAP\",SEC=\"open\",KEY=12345,CHANNEL=1,PREAMBLE=0,MAX_SCB=8,END"); */
+-    ret = setCommand(iface, "AP_SET_CFG");
++    ret = setCommand(mIface, "AP_SET_CFG");
+     if (ret) {
+         LOGE("Softap set - failed: %d", ret);
+     }
+@@ -435,7 +514,7 @@ int SoftapController::fwReloadSoftap(int argc, char *argv[])
+     char *fwpath;
+ 
+     if (mSock < 0) {
+-        LOGE("Softap fwrealod - failed to open socket");
++        LOGE("Softap fwreload - failed to open socket");
+         return -1;
+     }
+     if (argc < 4) {
+-- 
+1.8.3.2
+
