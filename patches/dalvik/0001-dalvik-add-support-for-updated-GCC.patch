@@ -1,0 +1,26 @@
+From ccf1f8d3212b7b4846b2be97c5587abdc8a85bdc Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Sat, 27 Sep 2014 20:28:18 +0200
+Subject: [PATCH] dalvik: add support for updated GCC
+
+Change-Id: If1e9077d75e42dcffb121adab9509c27a6befb58
+---
+ vm/native/dalvik_system_Zygote.cpp | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/vm/native/dalvik_system_Zygote.cpp b/vm/native/dalvik_system_Zygote.cpp
+index 812582d..3606e24 100644
+--- a/vm/native/dalvik_system_Zygote.cpp
++++ b/vm/native/dalvik_system_Zygote.cpp
+@@ -21,9 +21,7 @@
+ #include "native/InternalNativePriv.h"
+ 
+ #include <signal.h>
+-#if (__GNUC__ == 4 && (__GNUC_MINOR__ == 7 || __GNUC_MINOR__ == 8))
+ #include <sys/resource.h>
+-#endif
+ #include <sys/types.h>
+ #include <sys/wait.h>
+ #include <sys/mman.h>
+-- 
+2.1.1
