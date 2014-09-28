@@ -1,0 +1,24 @@
+From 622291f551bcee9465fe80a2d5e4fbc5c4a296b0 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Sun, 28 Sep 2014 18:57:35 +0200
+Subject: [PATCH] webkit: add support for updated GCC
+
+---
+ WebCore/dom/make_names.pl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/WebCore/dom/make_names.pl b/WebCore/dom/make_names.pl
+index 083e309..4494ee7 100755
+--- a/WebCore/dom/make_names.pl
++++ b/WebCore/dom/make_names.pl
+@@ -47,7 +47,7 @@ my %tags = ();
+ my %attrs = ();
+ my %parameters = ();
+ my $extraDefines = 0;
+-my $preprocessor = "/usr/bin/gcc -E -P -x c++";
++my $preprocessor = "/usr/bin/gcc -E -x c++";
+ 
+ GetOptions(
+     'tags=s' => \$tagsFile, 
+-- 
+2.1.1
