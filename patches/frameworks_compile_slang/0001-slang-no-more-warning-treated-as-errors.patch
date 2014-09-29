@@ -1,0 +1,25 @@
+From a7b99359b2a224c5680679b08f9d7b59e587d645 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Mon, 29 Sep 2014 17:34:09 +0200
+Subject: [PATCH] slang: no more warning treated as errors In some distros it
+ broke the build process
+
+---
+ Android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Android.mk b/Android.mk
+index a783ba9..8863240 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -19,7 +19,7 @@ ifeq ($(TARGET_BUILD_APPS),)
+ 
+ LOCAL_PATH := $(call my-dir)
+ 
+-local_cflags_for_slang := -Wno-sign-promo -Wall -Wno-unused-parameter -Werror
++local_cflags_for_slang := -Wno-sign-promo -Wall -Wno-unused-parameter
+ ifneq ($(TARGET_BUILD_VARIANT),eng)
+ local_cflags_for_slang += -D__DISABLE_ASSERTS
+ endif
+-- 
+2.1.1
