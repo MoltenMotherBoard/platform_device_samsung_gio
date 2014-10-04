@@ -1,0 +1,673 @@
+From bddc3244761fd01cef8f4ac433a14681ae5d02ed Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Sat, 4 Oct 2014 18:45:24 +0200
+Subject: [PATCH] vendor/cm: unified patch from Jellaxy original branch
+
+---
+ CONTRIBUTORS.mkdn                      |  20 +---
+ config/common.mk                       |  24 ++--
+ config/common_mini_phone.mk            |  12 +-
+ config/mini.ml                         |  19 +++
+ config/tiny.mk                         | 211 +++++++++++++++++++++++++++++++++
+ get-prebuilts                          |   3 +-
+ jenkins-build-targets                  |   0
+ prebuilt/common/bin/backuptool.sh      |  17 +--
+ prebuilt/common/etc/apns-conf-cdma.xml |  44 +++----
+ prebuilt/common/etc/apns-conf.xml      |   4 -
+ prebuilt/common/etc/init.local.rc      |   4 -
+ tools/opticharger                      |   2 +-
+ vendorsetup.sh                         |   2 +-
+ 13 files changed, 277 insertions(+), 85 deletions(-)
+ create mode 100644 config/mini.ml
+ create mode 100644 config/tiny.mk
+ create mode 100644 jenkins-build-targets
+
+diff --git a/CONTRIBUTORS.mkdn b/CONTRIBUTORS.mkdn
+index ae5b6e4..31e833a 100644
+--- a/CONTRIBUTORS.mkdn
++++ b/CONTRIBUTORS.mkdn
+@@ -6,19 +6,14 @@ Maintainers (CyanogenMod 10):
+ * __Acer A700:__ pawitp
+ * __Asus EeePad Transformer (TF101):__ Bumble-Bee, EnJens
+ * __Asus EeePad Transformer Prime (TF201):__ Bumble-Bee, EnJens
+-* __Asus EeePad Transformer Pad (TF300T):__ xplodwild
+-* __Asus EeePad Transformer Pad Infinity (TF700T):__ xplodwild, Aaron Echols, Markus Hoeber
++* __Asus EeePad Transformer Pad TF300T:__ xplodwild
+ * __B&N NookColor (encore):__ eyeballer, fattire, keyodi, krylon360, sluo (NookieDevs)
+ * __Google Galaxy Nexus:__ , bekit, Bumble-Bee, burnsra, KalimochoAz
+ * __Google Nexus S:__ burnsra, KalimochoAz
+-* __Google Nexus 7:__ fattire
+-* __Google Nexus 10:__ atinm, kornyone
+-* __HTC Amaze 4G:__ sportsstar89, intervigil
++* __Google Nexus 7:__ 
+ * __HTC Evo 4G LTE:__ kushdeck, toastcfh
+ * __HTC One S:__ intervigil, xkonni
+ * __HTC One XL:__ h8rift, intervigil
+-* __LG Optimus 3D {P920):__ arcee
+-* __LG Optimus Black {P970):__ arcee
+ * __LG Optimus LTE (P930) / LG Nitro HD {P935):__ arcee
+ * __LG Optimus LTE (SK Telecom) (SU640):__ arcee
+ * __Motorola Xoom (WiFi):__ bazar, SteadyHawkin, TDR (Team Rogue)
+@@ -53,13 +48,11 @@ Translators:
+ ------------
+ * __Catalan:__ Oriol Pellicer
+ * __Croatian:__ Antonio Marin
+-* __Czech:__ Ondrej Zima, Radovan Kepak, Pavel Kucera, Jozka Jozin, Jiri Silvarich, Vaclav Moucha
++* __Czech:__ Ondrej Zima
+ * __Dutch:__ Marco Brohet, Kasper Hettinga, Sam Segers, Bart Tiemersma, Eddy Witkamp
+-* __Finnish:__ Antti Leukkunen, Niko Koivu
++* __Finnish:__ Antti Leukkunen
+ * __French:__ Sébastien Vaucher, David Girault, Tanguy Pruvot
+-* __German:__ Kim Lê, Jacob Müller, Patrick Schaaf, Christoph Quiter, Markus Hoeber, Matthias Büchner
+-* __Greek:__ Michael Bestas
+-* __Hungarian:__ Tamás Tóth, Dávid László, Dániel Buga
++* __German:__ Matthias Büchner, Alexander Hofbauer, Sebastian K., Ricco Thiel, Andreas Böhm, Kim Lê
+ * __Italian:__ Francesco Foresta, Moreno Pojer, Eugenio Ziliotto, Giulio Cervera, Mauro Bazzano
+ * __Japanese:__ Takuo Kitame
+ * __Korean:__ Inseok Lee
+@@ -69,7 +62,6 @@ Translators:
+ * __Russian:__ OlegKrikun, Pavel Volkov, Kir Kolyshkin
+ * __Simplified Chinese:__ comercy, Qian Zheng, Andrew Jiang, John Hsing
+ * __Slovak:__ Juraj Janecek
+-* __Spanish:__ PeRiJeY, KalimochoAz, Chuckycrx, Jorge Ruesga, djMesias
++* __Spanish:__ PeRiJeY, KalimochoAz, Chuckycrx, Jorge Ruesga
+ * __Swedish:__ Patrik Kullman
+ * __Traditional Chinese:__ Ladios Jonquil
+-* __Turkish:__ Ethem Evlice (androidmeda)
+diff --git a/config/common.mk b/config/common.mk
+index 7a27fb0..6db5581 100644
+--- a/config/common.mk
++++ b/config/common.mk
+@@ -1,7 +1,5 @@
+ PRODUCT_BRAND ?= cyanogenmod
+ 
+-SUPERUSER_EMBEDDED := true
+-
+ # To deal with CM9 specifications
+ # TODO: remove once all devices have been switched
+ ifneq ($(TARGET_BOOTANIMATION_NAME),)
+@@ -105,9 +103,9 @@ PRODUCT_COPY_FILES +=  \
+     vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm4.so:system/lib/libjackpal-androidterm4.so
+ 
+ # Bring in camera effects
+-PRODUCT_COPY_FILES +=  \
+-    vendor/cm/prebuilt/common/media/LMprec_508.emd:system/media/LMprec_508.emd \
+-    vendor/cm/prebuilt/common/media/PFFprec_600.emd:system/media/PFFprec_600.emd
++#PRODUCT_COPY_FILES +=  \
++#    vendor/cm/prebuilt/common/media/LMprec_508.emd:system/media/LMprec_508.emd \
++#    vendor/cm/prebuilt/common/media/PFFprec_600.emd:system/media/PFFprec_600.emd
+ 
+ # Enable SIP+VoIP on all targets
+ PRODUCT_COPY_FILES += \
+@@ -135,10 +133,10 @@ PRODUCT_PACKAGES += \
+ 
+ # Optional CM packages
+ PRODUCT_PACKAGES += \
+-    VideoEditor \
+     VoiceDialer \
+     SoundRecorder \
+     Basic
++#    VideoEditor \
+ 
+ # Custom CM packages
+ PRODUCT_PACKAGES += \
+@@ -146,23 +144,17 @@ PRODUCT_PACKAGES += \
+     DSPManager \
+     libcyanogen-dsp \
+     audio_effects.conf \
+-    CMWallpapers \
+-    Apollo \
+-    CMUpdater \
+     CMFileManager
++#    CMWallpapers \
++#    Apollo \
++#    CMUpdater
+ 
+ # Extra tools in CM
+ PRODUCT_PACKAGES += \
+     openvpn \
+     e2fsck \
+     mke2fs \
+-    tune2fs \
+-    bash \
+-    vim \
+-    nano \
+-    htop \
+-    powertop \
+-    lsof
++    tune2fs
+ 
+ # Openssh
+ PRODUCT_PACKAGES += \
+diff --git a/config/common_mini_phone.mk b/config/common_mini_phone.mk
+index 11b89e8..1fbdfd4 100644
+--- a/config/common_mini_phone.mk
++++ b/config/common_mini_phone.mk
+@@ -2,19 +2,19 @@
+ $(call inherit-product, vendor/cm/config/common.mk)
+ 
+ # Bring in all audio files
+-include frameworks/base/data/sounds/NewAudio.mk
++include frameworks/base/data/sounds/OldAudio.mk
+ 
+ # Include CM audio files
+-include vendor/cm/config/cm_audio.mk
++#include vendor/cm/config/cm_audio.mk
+ 
+ # Default ringtone
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    ro.config.ringtone=Orion.ogg \
+-    ro.config.notification_sound=Deneb.ogg \
+-    ro.config.alarm_alert=Hassium.ogg
++    ro.config.ringtone=Ring_Digital_02.ogg \
++    ro.config.notification_sound=F1_New_SMS.ogg \
++    ro.config.alarm_alert=Alarm_Beep_03.ogg
+ 
+ PRODUCT_PACKAGES += \
+-  Mms
++    Mms
+ 
+ ifeq ($(TARGET_SCREEN_WIDTH) $(TARGET_SCREEN_HEIGHT),$(space))
+     PRODUCT_COPY_FILES += \
+diff --git a/config/mini.ml b/config/mini.ml
+new file mode 100644
+index 0000000..6f25cc7
+--- /dev/null
++++ b/config/mini.ml
+@@ -0,0 +1,19 @@
++# Mini config (Required /system size: min=175MB)
++PRODUCT_PACKAGES += \
++    Trebuchet \
++    DSPManager \
++    libcyanogen-dsp \
++    audio_effects.conf \
++    Apollo \
++    CMFileManager \
++    Basic \
++    LockClock
++
++PRODUCT_PACKAGES += \
++    Development \
++    Email2 \
++    Exchange2 \
++    SoundRecorder
++
++
++$(call inherit-product, vendor/cm/config/tiny.mk)
+diff --git a/config/tiny.mk b/config/tiny.mk
+new file mode 100644
+index 0000000..78e575a
+--- /dev/null
++++ b/config/tiny.mk
+@@ -0,0 +1,211 @@
++PRODUCT_BRAND ?= cyanogenmod
++
++### Boot animation stuff
++
++# To deal with CM9 specifications
++# TODO: remove once all devices have been switched
++ifneq ($(TARGET_BOOTANIMATION_NAME),)
++TARGET_SCREEN_DIMENSIONS := $(subst -, $(space), $(subst x, $(space), $(TARGET_BOOTANIMATION_NAME)))
++ifeq ($(TARGET_SCREEN_WIDTH),)
++TARGET_SCREEN_WIDTH := $(word 2, $(TARGET_SCREEN_DIMENSIONS))
++endif
++ifeq ($(TARGET_SCREEN_HEIGHT),)
++TARGET_SCREEN_HEIGHT := $(word 3, $(TARGET_SCREEN_DIMENSIONS))
++endif
++endif
++
++ifneq ($(TARGET_SCREEN_WIDTH) $(TARGET_SCREEN_HEIGHT),$(space))
++
++# clear TARGET_BOOTANIMATION_NAME in case it was set for CM9 purposes
++TARGET_BOOTANIMATION_NAME :=
++
++# determine the smaller dimension
++TARGET_BOOTANIMATION_SIZE := $(shell \
++  if [ $(TARGET_SCREEN_WIDTH) -lt $(TARGET_SCREEN_HEIGHT) ]; then \
++    echo $(TARGET_SCREEN_WIDTH); \
++  else \
++    echo $(TARGET_SCREEN_HEIGHT); \
++  fi )
++
++# get a sorted list of the sizes
++bootanimation_sizes := $(subst .zip,, $(shell ls vendor/cm/prebuilt/common/bootanimation))
++bootanimation_sizes := $(shell echo -e $(subst $(space),'\n',$(bootanimation_sizes)) | sort -rn)
++
++# find the appropriate size and set
++define check_and_set_bootanimation
++$(eval TARGET_BOOTANIMATION_NAME := $(shell \
++  if [ -z "$(TARGET_BOOTANIMATION_NAME)" ]; then
++    if [ $(1) -le $(TARGET_BOOTANIMATION_SIZE) ]; then \
++      echo $(1); \
++      exit 0; \
++    fi;
++  fi;
++  echo $(TARGET_BOOTANIMATION_NAME); ))
++endef
++$(foreach size,$(bootanimation_sizes), $(call check_and_set_bootanimation,$(size)))
++
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/bootanimation/$(TARGET_BOOTANIMATION_NAME).zip:system/media/bootanimation.zip
++endif
++
++### EOF Boot animation stuff
++
++
++# We are... MMB!
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.rommanager.developerid=MoltenMotherBoard
++
++# Common props
++
++PRODUCT_BUILD_PROP_OVERRIDES += BUILD_UTC_DATE=0
++
++PRODUCT_PROPERTY_OVERRIDES += \
++    keyguard.no_require_sim=true \
++    ro.url.legal=http://www.google.com/intl/%s/mobile/android/basic/phone-legal.html \
++    ro.url.legal.android_privacy=http://www.google.com/intl/%s/mobile/android/basic/privacy.html \
++    ro.com.google.clientidbase=android-google \
++    ro.com.android.wifi-watchlist=GoogleGuest \
++    ro.setupwizard.enterprise_mode=1 \
++    ro.com.android.dateformat=MM-dd-yyyy \
++    ro.com.android.dataroaming=false
++
++# Copy over the changelog to the device
++PRODUCT_COPY_FILES += \
++    vendor/cm/CHANGELOG.mkdn:system/etc/CHANGELOG-CM.txt
++
++# Backup Tool
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/bin/backuptool.sh:system/bin/backuptool.sh \
++    vendor/cm/prebuilt/common/bin/backuptool.functions:system/bin/backuptool.functions \
++    vendor/cm/prebuilt/common/bin/50-cm.sh:system/addon.d/50-cm.sh
++
++# init.d support
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/etc/init.d/00banner:system/etc/init.d/00banner \
++    vendor/cm/prebuilt/common/bin/sysinit:system/bin/sysinit
++
++# userinit support
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/etc/init.d/90userinit:system/etc/init.d/90userinit
++
++# CM-specific init file
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/etc/init.local.rc:root/init.cm.rc
++
++# Compcache/Zram support
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/bin/compcache:system/bin/compcache \
++    vendor/cm/prebuilt/common/bin/handle_compcache:system/bin/handle_compcache
++
++# Nam configuration script
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/bin/modelid_cfg.sh:system/bin/modelid_cfg.sh
++
++PRODUCT_COPY_FILES +=  \
++    vendor/cm/proprietary/Term.apk:system/app/Term.apk \
++    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm4.so:system/lib/libjackpal-androidterm4.so
++
++# Bring in camera effects
++PRODUCT_COPY_FILES +=  \
++    vendor/cm/prebuilt/common/media/LMprec_508.emd:system/media/LMprec_508.emd \
++    vendor/cm/prebuilt/common/media/PFFprec_600.emd:system/media/PFFprec_600.emd
++
++# Enable SIP+VoIP on all targets
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml
++
++# This is CM!
++PRODUCT_COPY_FILES += \
++    vendor/cm/config/permissions/com.cyanogenmod.android.xml:system/etc/permissions/com.cyanogenmod.android.xml
++
++# Don't export PS1 in /system/etc/mkshrc.
++PRODUCT_COPY_FILES += \
++    vendor/cm/prebuilt/common/etc/mkshrc:system/etc/mkshrc
++
++# T-Mobile theme engine
++include vendor/cm/config/themes_common.mk
++
++# Required CM packages
++PRODUCT_PACKAGES += \
++    LegacyCamera \
++    Development \
++    LatinIME \
++    SpareParts \
++    Superuser \
++    su
++
++# Optional CM packages
++PRODUCT_PACKAGES += \
++    VoiceDialer \
++    SoundRecorder \
++    Basic
++
++# Custom CM packages
++PRODUCT_PACKAGES += \
++    Trebuchet \
++    DSPManager \
++    libcyanogen-dsp \
++    audio_effects.conf \
++    CMFileManager
++
++# Extra tools in CM
++PRODUCT_PACKAGES += \
++    openvpn \
++    e2fsck \
++    mke2fs \
++    tune2fs
++
++# Openssh
++PRODUCT_PACKAGES += \
++    scp \
++    sftp \
++    ssh \
++    sshd \
++    sshd_config \
++    ssh-keygen \
++    start-ssh
++
++# rsync
++PRODUCT_PACKAGES += \
++    rsync
++
++PRODUCT_PACKAGE_OVERLAYS += vendor/cm/overlay/dictionaries
++PRODUCT_PACKAGE_OVERLAYS += vendor/cm/overlay/common
++
++PRODUCT_VERSION_MAJOR = 10
++PRODUCT_VERSION_MINOR = 0
++PRODUCT_VERSION_MAINTENANCE = 5
++PRODUCT_VERSION_DEVICE_SPECIFIC = -MMB_JB
++
++# Set CM_BUILDTYPE
++ifdef CM_NIGHTLY
++    CM_BUILDTYPE := NIGHTLY
++endif
++ifdef CM_EXPERIMENTAL
++    CM_BUILDTYPE := EXPERIMENTAL
++endif
++ifdef CM_RELEASE
++    CM_BUILDTYPE := RELEASE
++endif
++
++CM_BUILDTYPE := RELEASE
++
++ifdef CM_BUILDTYPE
++    ifdef CM_EXTRAVERSION
++        # Force build type to EXPERIMENTAL
++        CM_BUILDTYPE := EXPERIMENTAL
++        # Add leading dash to CM_EXTRAVERSION
++        CM_EXTRAVERSION := -$(CM_EXTRAVERSION)
++    endif
++else
++    # If CM_BUILDTYPE is not defined, set to UNOFFICIAL
++    CM_BUILDTYPE := UNOFFICIAL
++    CM_EXTRAVERSION :=
++endif
++
++CM_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(PRODUCT_VERSION_MAINTENANCE)$(PRODUCT_VERSION_DEVICE_SPECIFIC)-$(CM_BUILD)
++
++PRODUCT_PROPERTY_OVERRIDES += \
++  ro.cm.version=$(CM_VERSION) \
++  ro.modversion=$(CM_VERSION)
++
+diff --git a/get-prebuilts b/get-prebuilts
+index 1d2b6df..43b3435 100755
+--- a/get-prebuilts
++++ b/get-prebuilts
+@@ -1,9 +1,8 @@
+-
+ BASEDIR=`dirname $0`
+ 
+ mkdir -p $BASEDIR/proprietary
+ 
+ # Get Android Terminal Emulator (we use a prebuilt so it can update from the Market)
+ curl -L -o $BASEDIR/proprietary/Term.apk -O -L http://jackpal.github.com/Android-Terminal-Emulator/downloads/Term.apk
+-unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/*
++unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/armeabi/libjackpal-androidterm4.so
+ 
+diff --git a/jenkins-build-targets b/jenkins-build-targets
+new file mode 100644
+index 0000000..e69de29
+diff --git a/prebuilt/common/bin/backuptool.sh b/prebuilt/common/bin/backuptool.sh
+index a22c89f..6ba1323 100755
+--- a/prebuilt/common/bin/backuptool.sh
++++ b/prebuilt/common/bin/backuptool.sh
+@@ -20,25 +20,14 @@ restore_addon_d() {
+   rm -rf /tmp/addon.d/
+ }
+ 
+-# Proceed only if /system is the expected major and minor version
++# Proceed only if /system is the expected major version
+ check_prereq() {
+ if ( ! grep -q "^ro.cm.version=$V.*" /system/build.prop ); then
+-  echo "Not backing up files from incompatible version: $V"
++  echo "Not backing up files from incompatible version."
+   exit 127
+ fi
+ }
+ 
+-check_blacklist() {
+-  if [ -f /system/addon.d/blacklist ];then
+-      ## Discard any known bad backup scripts
+-      cd /$1/addon.d/
+-      for f in *sh; do 
+-          s=$(md5sum $f | awk {'print $1'})
+-          grep -q $s /system/addon.d/blacklist && rm -f $f
+-      done
+-  fi
+-}
+-
+ # Execute /system/addon.d/*.sh scripts with $1 parameter
+ run_stage() {
+ for script in $(find /tmp/addon.d/ -name '*.sh' |sort -n); do
+@@ -50,7 +39,6 @@ case "$1" in
+   backup)
+     mkdir -p $C
+     check_prereq
+-    check_blacklist system
+     preserve_addon_d
+     run_stage pre-backup
+     run_stage backup
+@@ -58,7 +46,6 @@ case "$1" in
+   ;;
+   restore)
+     check_prereq
+-    check_blacklist tmp
+     run_stage pre-restore
+     run_stage restore
+     run_stage post-restore
+diff --git a/prebuilt/common/etc/apns-conf-cdma.xml b/prebuilt/common/etc/apns-conf-cdma.xml
+index f0d5c23..08eaa8c 100644
+--- a/prebuilt/common/etc/apns-conf-cdma.xml
++++ b/prebuilt/common/etc/apns-conf-cdma.xml
+@@ -38,19 +38,19 @@
+   <!--<apn carrier="Sprint" mcc="310" mnc="120" apn="Sprint" user="Sprint" server="*" password="*" mmsc="http://mms.sprintpcs.com" authtype="3"/>-->
+ 
+   <!-- Modify Apn database for Sprint LTE support -->
+-  <apn carrier="LTE - SPRINT test ISP" mcc="001" mnc="01" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - SPRINT test ISP" mcc="001" mnc="01" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - SPRINT test OTA" mcc="001" mnc="01" apn="otasn" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - SPRINT test PAM" mcc="001" mnc="01" apn="pamsn" type="dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+-  <apn carrier="LTE - SPRINT test ISP" mcc="001" mnc="010" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - SPRINT test ISP" mcc="001" mnc="010" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - SPRINT test OTA" mcc="001" mnc="010" apn="otasn" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - SPRINT test PAM" mcc="001" mnc="010" apn="pamsn" type="dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <!-- END modify Apn database for Sprint LTE support -->
+ 
+   <!-- Modify Apn database for Sprint EHRPD support -->
+-  <apn carrier="EHRPD - SPRINT test ISP" mcc="001" mnc="01" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - SPRINT test ISP" mcc="001" mnc="01" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - SPRINT test OTA" mcc="001" mnc="01" apn="otasn" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - SPRINT test PAM" mcc="001" mnc="01" apn="pamsn" type="dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+-  <apn carrier="EHRPD - SPRINT test ISP" mcc="001" mnc="010" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - SPRINT test ISP" mcc="001" mnc="010" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - SPRINT test OTA" mcc="001" mnc="010" apn="otasn" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - SPRINT test PAM" mcc="001" mnc="010" apn="pamsn" type="dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <!-- END modify Apn database for Sprint EHRPD support -->
+@@ -62,69 +62,69 @@
+   <!-- Sprint LTE/eHRPD: Programmatically added in S3 LG8 build. -->
+   <apn carrier="APN0 LTE ota" mcc="310" mnc="120" apn="otasn" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="APN0 EHRPD ota" mcc="310" mnc="120" apn="otasn" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+-  <apn carrier="APN2 LTE internet" mcc="310" mnc="120" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IP" roaming_protocol="IP" bearer="14" />
+-  <apn carrier="APN2 EHRPD internet" mcc="310" mnc="120" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="APN2 LTE internet" mcc="310" mnc="120" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
++  <apn carrier="APN2 EHRPD internet" mcc="310" mnc="120" apn="n.ispsn" type="default,mms" mmsc="http://mms.sprintpcs.com" mmsproxy="68.28.31.7" mmsport="80" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+ <!-- END Sprint -->
+ 
+ <!-- Verizon Wireless -->
+   <!-- Modify Apn database for VZW CDMA MMS, internet, cbs, fota, and ims support -->
+-  <apn carrier="Verizon" mcc="310" mnc="004" apn="internet" type="default,mms,dun" mmsc="http://mms.vtext.com/servlets/mms" protocol="IP" />
+-  <apn carrier="Verizon Internet" mcc="310" mnc="004" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" />
++  <apn carrier="Verizon" mcc="310" mnc="004" apn="internet" type="default,mms,dun" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" />
++  <apn carrier="Verizon Internet" mcc="310" mnc="004" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" />
+   <apn carrier="Verizon FOTA" mcc="310" mnc="004" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" />
+   <apn carrier="Verizon IMS" mcc="310" mnc="004" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" />
+   <apn carrier="Verizon CBS" mcc="310" mnc="004" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" />
+ 
+   <!-- Modify Apn database for VZW LTE support -->
+-  <apn carrier="LTE - Verizon Internet" mcc="311" mnc="480" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - Verizon Internet" mcc="311" mnc="480" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Verizon FOTA" mcc="311" mnc="480" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Verizon IMS" mcc="311" mnc="480" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Verizon CBS" mcc="311" mnc="480" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Verizon SUPL" mcc="311" mnc="480" apn="VZW800" type="supl" protocol="IPV4V6" bearer="14" />
+-  <apn carrier="LTE - VZW Roaming Internet" mcc="204" mnc="04" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - VZW Roaming Internet" mcc="204" mnc="04" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Roaming FOTA" mcc="204" mnc="04" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Roaming IMS" mcc="204" mnc="04" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Roaming CBS" mcc="204" mnc="04" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+-  <apn carrier="LTE - Test Internet" mcc="001" mnc="01" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - Test Internet" mcc="001" mnc="01" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Test FOTA" mcc="001" mnc="01" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Test IMS" mcc="001" mnc="01" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - Test CBS" mcc="001" mnc="01" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+-  <apn carrier="LTE - VZW Test Internet" mcc="001" mnc="010" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - VZW Test Internet" mcc="001" mnc="010" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test FOTA" mcc="001" mnc="010" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14"  />
+   <apn carrier="LTE - VZW Test IMS" mcc="001" mnc="010" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test CBS" mcc="001" mnc="010" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+-  <apn carrier="LTE - VZW Test Internet" mcc="246" mnc="81" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - VZW Test Internet" mcc="246" mnc="81" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test FOTA" mcc="246" mnc="81" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test IMS" mcc="246" mnc="81" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test CBS" mcc="246" mnc="81" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+-  <apn carrier="LTE - VZW Test Internet" mcc="246" mnc="081" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - VZW Test Internet" mcc="246" mnc="081" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test FOTA" mcc="246" mnc="081" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test IMS" mcc="246" mnc="081" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <apn carrier="LTE - VZW Test CBS" mcc="246" mnc="081" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <!-- END modify Apn database for VZW LTE support -->
+ 
+   <!-- Modify Apn database for VZW EHRPD support -->
+-  <apn carrier="EHRPD - Verizon Internet" mcc="311" mnc="480" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="13"  />
++  <apn carrier="EHRPD - Verizon Internet" mcc="311" mnc="480" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13"  />
+   <apn carrier="EHRPD - Verizon FOTA"  mcc="311" mnc="480" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - Verizon IMS" mcc="311" mnc="480" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - Verizon CBS" mcc="311" mnc="480" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - Verizon SUPL" mcc="311" mnc="480" apn="VZW800" type="supl" protocol="IPV4V6" bearer="13" />
+-  <apn carrier="EHRPD - VZW Roaming Internet" mcc="204" mnc="04" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - VZW Roaming Internet" mcc="204" mnc="04" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Roaming FOTA" mcc="204" mnc="04" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Roaming IMS" mcc="204" mnc="04" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Roaming CBS" mcc="204" mnc="04" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+-  <apn carrier="EHRPD - Test Internet" mcc="001" mnc="01" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - Test Internet" mcc="001" mnc="01" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - Test FOTA" mcc="001" mnc="01" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13"/>
+   <apn carrier="EHRPD - Test IMS" mcc="001" mnc="01" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - Test CBS" mcc="001" mnc="01" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+-  <apn carrier="EHRPD - VZW Test Internet" mcc="001" mnc="010" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - VZW Test Internet" mcc="001" mnc="010" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test FOTA" mcc="001" mnc="010" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test IMS" mcc="001" mnc="010" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test CBS" mcc="001" mnc="010" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+-  <apn carrier="EHRPD - VZW Test Internet" mcc="246" mnc="81" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - VZW Test Internet" mcc="246" mnc="81" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test FOTA" mcc="246" mnc="81" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test IMS" mcc="246" mnc="81" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test CBS" mcc="246" mnc="81" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+-  <apn carrier="EHRPD - VZW Test Internet" mcc="246" mnc="081" apn="VZWINTERNET" type="default,dun" protocol="IP" roaming_protocol="IP" bearer="13" />
++  <apn carrier="EHRPD - VZW Test Internet" mcc="246" mnc="081" apn="VZWINTERNET" type="default,dun" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test FOTA" mcc="246" mnc="081" apn="VZWADMIN" type="fota" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test IMS" mcc="246" mnc="081" apn="VZWIMS" type="ims" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+   <apn carrier="EHRPD - VZW Test CBS" mcc="246" mnc="081" apn="VZWAPP" type="cbs,mms" mmsc="http://mms.vtext.com/servlets/mms" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="13" />
+@@ -136,8 +136,8 @@
+   <apn carrier="USCC" mcc="311" mnc="220" apn="internet" mmsc="http://mmsc1.uscc.net/mmsc/MMS" authtype="3" port="80" mmsport="80" type="mms" />
+ 
+   <!-- Modify Apn database for USCC LTE support -->
+-  <apn carrier="LTE - USCC INTERNET" mcc="311" mnc="580" apn="usccinternet" type="default,dun,mms,fota" mmsc="http://mmsc1.uscc.net/mmsc/MMS" protocol="IP" roaming_protocol="IP" bearer="14" />
+-  <apn carrier="LTE - USCC INTERNET 2" mcc="311" mnc="225" apn="usccinternet" type="default,dun,mms,fota" mmsc="http://mmsc1.uscc.net/mmsc/MMS" protocol="IP" roaming_protocol="IP" bearer="14" />
++  <apn carrier="LTE - USCC INTERNET" mcc="311" mnc="580" apn="usccinternet" type="default,dun,mms,fota" mmsc="http://mmsc1.uscc.net/mmsc/MMS" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
++  <apn carrier="LTE - USCC INTERNET 2" mcc="311" mnc="225" apn="usccinternet" type="default,dun,mms,fota" mmsc="http://mmsc1.uscc.net/mmsc/MMS" protocol="IPV4V6" roaming_protocol="IPV4V6" bearer="14" />
+   <!-- END modify Apn database for USCC LTE support -->
+ <!-- END US Cellular -->
+ 
+diff --git a/prebuilt/common/etc/apns-conf.xml b/prebuilt/common/etc/apns-conf.xml
+index 2ec0b1b..2a47fda 100644
+--- a/prebuilt/common/etc/apns-conf.xml
++++ b/prebuilt/common/etc/apns-conf.xml
+@@ -530,7 +530,6 @@
+   <apn carrier="Fido Default" mcc="302" mnc="370" apn="fido-core-appl1.apn" mmsc="http://mms.fido.ca" mmsproxy="205.151.11.13" mmsport="80" type="default,supl,mms" />
+   <apn carrier="Fido Internet" mcc="302" mnc="370" apn="internet.fido.ca" type="default,supl" />
+   <apn carrier="Fido Tethering" mcc="302" mnc="370" apn="isp.fido.apn" type="default,supl" />
+-  <apn carrier="Fido LTE" mcc="302" mnc="370" apn="ltemobile.apn" mmsc="http://mms.fido.ca" mmsproxy="205.151.11.13" mmsport="80" type="default,supl,mms" />
+   <apn carrier="Wind CA" mcc="302" mnc="490" apn="internet.windmobile.ca" type="default,supl" />
+   <apn carrier="Wind CA MMS" mcc="302" mnc="490" apn="mms.windmobile.ca" mmsc="http://mms.windmobile.ca" mmsproxy="74.115.197.70" mmsport="8080" type="mms" />
+   <apn carrier="Bell" mcc="302" mnc="610" apn="pda.bell.ca" proxy="web.wireless.bell.ca" port="80" mmsc="http://mms.bell.ca/mms/wapenc" mmsproxy="web.wireless.bell.ca" mmsport="80" type="" />
+@@ -575,7 +574,6 @@
+   <apn carrier="AWS MMS" mcc="310" mnc="380" apn="proxy" mmsc="http://mmsc.mymmode.com" mmsproxy="10.250.250.55" mmsport="8080" type="mms" />
+   <apn carrier="Celloneet MMS" mcc="310" mnc="390" apn="mms.celloneet.com" user="user1@mms.celloneet.com" password="celloneet" mmsc="http://mms.celloneet.com/servlets/mms" mmsproxy="63.99.231.135" mmsport="8080" type="mms" />
+   <apn carrier="ATT" mcc="310" mnc="410" apn="wap.cingular" user="WAP@CINGULARGPRS.COM" mmsc="http://mmsc.cingular.com" mmsproxy="wireless.cingular.com" mmsport="80" type="default,supl,mms" />
+-  <apn carrier="ATT Phone" mcc="310" mnc="410" apn="phone" mmsc="http://mmsc.mobile.att.net" mmsproxy="proxy.mobile.att.net" mmsport="80" type="default,supl,mms" />
+   <apn carrier="ATT LTE" mcc="310" mnc="410" apn="pta" mmsc="http://mmsc.mobile.att.net" mmsproxy="proxy.mobile.att.net" mmsport="80" type="default,supl,mms" />
+   <apn carrier="StraightTalk ATT" mcc="310" mnc="410" apn="att.mvno" mmsc="http://mmsc.cingular.com" mmsproxy="66.209.11.33" mmsport="80" type="default,supl,mms" />
+   <apn carrier="CBW Internet" apn="wap.gocbw.com" proxy="" port="" user="cbw" password="" server="216.68.79.199" mmsc="http://mms.gocbw.com:8088/mms" mmsproxy="216.68.79.202" mmsport="80" mcc="310" mnc="420" type="default,supl,mms" />
+@@ -751,8 +749,6 @@
+   <apn carrier="Reliance" mcc="404" mnc="67" apn="rcomnet" type="default,supl" />
+   <apn carrier="MTNL" mcc="404" mnc="69" apn="mtnl.net" user="mtnl" password="mtnl123" proxy="10.10.10.10" port="9401" type="default,supl" />
+   <apn carrier="MTNL MMS" mcc="404" mnc="69" apn="mtnl.net" user="mtnl" password="mtnl123" mmsc="http://mtnlmms/" mmsproxy="10.10.10.10" mmsport="9401" type="mms" />
+-  <apn carrier="MTNL" mcc="404" mnc="68" apn="mtnl.net" user="mtnl" password="mtnl123" proxy="10.10.10.10" port="9401" type="default,supl" />
+-  <apn carrier="MTNL MMS" mcc="404" mnc="68" apn="mtnl.net" user="mtnl" password="mtnl123" mmsc="http://mtnlmms/" mmsproxy="10.10.10.10" mmsport="9401" type="mms" />
+   <apn carrier="Airtel" mcc="404" mnc="70" apn="airtelgprs.com" mmsc="http://100.1.201.171:10021/mmsc" mmsproxy="100.1.201.172" mmsport="8799" type="default,supl,mms" />
+   <apn carrier="BSNL" mcc="404" mnc="71" apn="bsnlnet" user="MSISDN" password="MSISDN" type="default,supl" />
+   <apn carrier="BSNL MMS" mcc="404" mnc="71" apn="mmssouth.cellone.in" user="MSISDN" password="mmsc" mmsc="http://10.7.236.11:8514" mmsproxy="10.7.236.11" mmsport="8080" type="mms" />
+diff --git a/prebuilt/common/etc/init.local.rc b/prebuilt/common/etc/init.local.rc
+index 521f931..2a31cc3 100644
+--- a/prebuilt/common/etc/init.local.rc
++++ b/prebuilt/common/etc/init.local.rc
+@@ -10,10 +10,6 @@ on post-fs-data
+     chown system system /cache/dalvik-cache
+     chmod 0771 /cache/dalvik-cache
+ 
+-# Import custom storage configuration
+-    chmod 0644 /data/system/storage.rc
+-    export_rc /data/system/storage.rc
+-
+ on boot
+     chown system system /sys/block/mmcblk0/queue/scheduler
+     chmod 0664 /sys/block/mmcblk0/queue/scheduler
+diff --git a/tools/opticharger b/tools/opticharger
+index 652e5c6..6991f0d 100755
+--- a/tools/opticharger
++++ b/tools/opticharger
+@@ -132,7 +132,7 @@ then
+     cp $BASE/$1 $BASE/$1.old
+ 
+     [ $QUIET ] || echo -e $CL_YLW"Repacking apk.."$CL_RST
+-    aapt p -0 .dat -0 .dict -0 .arsc -F $NAME .
++    aapt p -0 .dat -0 .dict -F $NAME .
+     
+     [ $QUIET ] || echo -e $CL_YLW"Resigning with cert: `echo $CERT`"$CL_RST
+ 
+diff --git a/vendorsetup.sh b/vendorsetup.sh
+index 1168473..aede0f6 100644
+--- a/vendorsetup.sh
++++ b/vendorsetup.sh
+@@ -1,4 +1,4 @@
+-for combo in $(wget -o /dev/null -O - https://raw.github.com/CyanogenMod/hudson/master/cm-build-targets | grep jellybean | awk {'print $1'})
++for combo in $(cat vendor/cm/jenkins-build-targets)
+ do
+     add_lunch_combo $combo
+ done
+-- 
+2.1.2
