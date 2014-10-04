@@ -1,0 +1,2998 @@
+From ce5b51936d948e9f4fa84227a8fa30c750e19c46 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Sat, 4 Oct 2014 16:03:55 +0200
+Subject: [PATCH] frameworks/av: unified patch from Jellaxy original branch
+
+---
+ camera/CameraParameters.cpp                        | 139 ++++++++----------
+ include/camera/CameraParameters.h                  | 109 ++++++--------
+ include/camera/QCameraParameters.h                 |   2 -
+ include/media/AudioParameter.h                     |   3 -
+ include/media/AudioRecord.h                        |   3 -
+ include/media/AudioSystem.h                        |  30 ----
+ include/media/AudioTrack.h                         |  12 --
+ include/media/IAudioFlinger.h                      |  21 ---
+ include/media/IAudioPolicyService.h                |   5 -
+ include/media/stagefright/ColorConverter.h         |   5 -
+ include/media/stagefright/MediaDefs.h              |   7 +-
+ include/media/stagefright/OMXCodec.h               |   7 -
+ media/libmedia/AudioParameter.cpp                  |   3 -
+ media/libmedia/AudioRecord.cpp                     |  37 -----
+ media/libmedia/AudioSystem.cpp                     |  62 +-------
+ media/libmedia/AudioTrack.cpp                      |  26 +---
+ media/libmedia/IAudioFlinger.cpp                   |  98 -------------
+ media/libmedia/IAudioPolicyService.cpp             |  18 ---
+ .../libmediaplayerservice/StagefrightRecorder.cpp  |   9 +-
+ media/libstagefright/ACodec.cpp                    |  59 +++++++-
+ media/libstagefright/Android.mk                    |  38 ++++-
+ media/libstagefright/AwesomePlayer.cpp             |  15 +-
+ media/libstagefright/CameraSource.cpp              |  15 --
+ media/libstagefright/MPEG4Writer.cpp               |   2 +-
+ media/libstagefright/MediaDefs.cpp                 |   7 +-
+ media/libstagefright/MediaExtractor.cpp            |   5 -
+ media/libstagefright/OMXCodec.cpp                  | 162 ++++++++++++++-------
+ media/libstagefright/OggExtractor.cpp              |   6 +-
+ .../StagefrightMetadataRetriever.cpp               |   4 +-
+ media/libstagefright/SurfaceMediaSource.cpp        |   4 -
+ .../colorconversion/ColorConverter.cpp             | 148 +------------------
+ .../colorconversion/SoftwareRenderer.cpp           |  47 ++++++
+ media/libstagefright/include/SoftwareRenderer.h    |   3 +
+ media/libstagefright/omx/Android.mk                |   4 -
+ media/libstagefright/omx/OMXMaster.cpp             |   3 -
+ media/libstagefright/omx/SoftOMXPlugin.cpp         |   6 -
+ services/audioflinger/AudioFlinger.cpp             | 144 +-----------------
+ services/audioflinger/AudioFlinger.h               |  36 -----
+ services/audioflinger/AudioPolicyService.cpp       |  44 ------
+ services/audioflinger/AudioPolicyService.h         |   5 -
+ .../libcameraservice/CameraHardwareInterface.h     |   3 -
+ services/camera/libcameraservice/CameraService.cpp |  13 +-
+ 42 files changed, 384 insertions(+), 985 deletions(-)
+
+diff --git a/camera/CameraParameters.cpp b/camera/CameraParameters.cpp
+index 4114458..3e4d874 100644
+--- a/camera/CameraParameters.cpp
++++ b/camera/CameraParameters.cpp
+@@ -49,7 +49,7 @@ const char CameraParameters::CAPTURE_MODE_BURST[] = "burst";
+ const char CameraParameters::CAPTURE_MODE_CONTI_BURST[] = "contiburst";
+ const char CameraParameters::CAPTURE_MODE_HDR[] = "hdr";
+ const char CameraParameters::CAPTURE_MODE_HJR[] = "hjr";
+-const char CameraParameters::CAPTURE_MODE_PANORAMA[] = "panorama";
++const char CameraParameters::CAPTURE_MODE_PANORAMA[] = "panorama";    
+ const char CameraParameters::CONTINUOUS_AF_OFF[] = "caf-off";
+ const char CameraParameters::CONTINUOUS_AF_ON[] = "caf-on";
+ const char CameraParameters::KEY_CONTINUOUS_AF[] = "continuous-af";
+@@ -100,9 +100,6 @@ const char CameraParameters::KEY_FOCUS_MODE[] = "focus-mode";
+ const char CameraParameters::KEY_SUPPORTED_FOCUS_MODES[] = "focus-mode-values";
+ const char CameraParameters::KEY_MAX_NUM_FOCUS_AREAS[] = "max-num-focus-areas";
+ const char CameraParameters::KEY_FOCUS_AREAS[] = "focus-areas";
+-#ifdef SONY_CAMERA
+-const char CameraParameters::KEY_FOCUS_AREA_CENTER[] = "focus-area-center";
+-#endif
+ const char CameraParameters::KEY_FOCAL_LENGTH[] = "focal-length";
+ const char CameraParameters::KEY_HORIZONTAL_VIEW_ANGLE[] = "horizontal-view-angle";
+ const char CameraParameters::KEY_VERTICAL_VIEW_ANGLE[] = "vertical-view-angle";
+@@ -123,14 +120,14 @@ const char CameraParameters::KEY_ZOOM_SUPPORTED[] = "zoom-supported";
+ const char CameraParameters::KEY_SMOOTH_ZOOM_SUPPORTED[] = "smooth-zoom-supported";
+ const char CameraParameters::KEY_FOCUS_DISTANCES[] = "focus-distances";
+ const char CameraParameters::KEY_VIDEO_FRAME_FORMAT[] = "video-frame-format";
+-#if defined(QCOM_HARDWARE) || defined(EXYNOS4X12_ENHANCEMENTS) || defined(HAVE_ISO)
+-const char CameraParameters::KEY_SUPPORTED_ISO_MODES[] = "iso-values";
+-const char CameraParameters::KEY_ISO_MODE[] = "iso";
+-#endif
+ #ifdef QCOM_HARDWARE
+ const char CameraParameters::KEY_LENSSHADE[] = "lensshade";
+ const char CameraParameters::KEY_SUPPORTED_LENSSHADE_MODES[] = "lensshade-values";
++#ifdef SAMSUNG_CAMERA_QCOM
++const char CameraParameters::KEY_AUTO_EXPOSURE[] = "metering";
++#else
+ const char CameraParameters::KEY_AUTO_EXPOSURE[] = "auto-exposure";
++#endif
+ const char CameraParameters::KEY_SUPPORTED_AUTO_EXPOSURE[] = "auto-exposure-values";
+ const char CameraParameters::KEY_DENOISE[] = "denoise";
+ const char CameraParameters::KEY_SUPPORTED_DENOISE[] = "denoise-values";
+@@ -146,12 +143,17 @@ const char CameraParameters::KEY_REDEYE_REDUCTION[] = "redeye-reduction";
+ const char CameraParameters::KEY_SUPPORTED_REDEYE_REDUCTION[] = "redeye-reduction-values";
+ const char CameraParameters::KEY_HIGH_DYNAMIC_RANGE_IMAGING[] = "hdr";
+ const char CameraParameters::KEY_SUPPORTED_HDR_IMAGING_MODES[] = "hdr-values";
++#ifndef SAMSUNG_CAMERA_HARDWARE
++const char CameraParameters::KEY_ISO_MODE[] = "iso";
++const char CameraParameters::KEY_SUPPORTED_ISO_MODES[] = "iso-values";
++#endif
+ #endif
+ #ifdef SAMSUNG_CAMERA_HARDWARE
+-const char CameraParameters::KEY_ANTI_SHAKE_MODE[] = "anti-shake";
+ const char CameraParameters::KEY_METERING[] = "metering";
+ const char CameraParameters::KEY_WDR[] = "wdr";
+-const char CameraParameters::KEY_WEATHER[] = "weather";
++const char CameraParameters::KEY_ANTI_SHAKE_MODE[] = "anti-shake";
++const char CameraParameters::KEY_ISO_MODE[] = "iso";
++const char CameraParameters::KEY_SUPPORTED_ISO_MODES[] = "iso-values";
+ #endif
+ const char CameraParameters::KEY_VIDEO_SIZE[] = "video-size";
+ const char CameraParameters::KEY_SUPPORTED_VIDEO_SIZES[] = "video-size-values";
+@@ -167,15 +169,8 @@ const char CameraParameters::KEY_VIDEO_STABILIZATION_SUPPORTED[] = "video-stabil
+ const char CameraParameters::KEY_ZSL[] = "zsl";
+ const char CameraParameters::KEY_SUPPORTED_ZSL_MODES[] = "zsl-values";
+ const char CameraParameters::KEY_CAMERA_MODE[] = "camera-mode";
+-#ifdef QCOM_SONY_HARDWARE
+-const char CameraParameters::KEY_EX_SUPPORTED_METERING_MODES[] = "semc-metering-mode-values";
+-#endif
+ #endif
+ const char CameraParameters::KEY_AE_BRACKET_HDR[] = "ae-bracket-hdr";
+-#if defined(CAMERA_POWERMODE) || defined(QCOM_SONY_HARDWARE)
+-const char CameraParameters::KEY_POWER_MODE[] = "power-mode";
+-const char CameraParameters::KEY_POWER_MODE_SUPPORTED[] = "power-mode-supported";
+-#endif
+ /*only effective when KEY_AE_BRACKET_HDR set to ae_bracketing*/
+ //const char CameraParameters::KEY_AE_BRACKET_SETTING_KEY[] = "ae-bracket-setting";
+ 
+@@ -243,26 +238,13 @@ const char CameraParameters::SCENE_MODE_FIREWORKS[] = "fireworks";
+ const char CameraParameters::SCENE_MODE_SPORTS[] = "sports";
+ const char CameraParameters::SCENE_MODE_PARTY[] = "party";
+ const char CameraParameters::SCENE_MODE_CANDLELIGHT[] = "candlelight";
+-#ifdef STE_SAMSUNG_HARDWARE
+-const char CameraParameters::SCENE_MODE_BACKLIGHT[] = "backlight";
+-const char CameraParameters::SCENE_MODE_DUSKDAWN[] = "duskdawn";
+-const char CameraParameters::SCENE_MODE_FALLCOLOR[] = "fallcolor";
+-const char CameraParameters::SCENE_MODE_TEXT[] = "text";
+-#endif
+-#ifdef QCOM_HARDWARE
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+ const char CameraParameters::SCENE_MODE_BACKLIGHT[] = "backlight";
+ const char CameraParameters::SCENE_MODE_FLOWERS[] = "flowers";
+ #endif
+ const char CameraParameters::SCENE_MODE_BARCODE[] = "barcode";
+ #ifdef QCOM_HARDWARE
+ const char CameraParameters::SCENE_MODE_AR[] = "AR";
+-#ifdef QCOM_SONY_HARDWARE
+-#ifdef QCOM_SONY_NEW_CAMERA
+-const char CameraParameters::SCENE_MODE_DOCUMENT[] = "document";
+-#else
+-const char CameraParameters::EX_SCENE_MODE_DOCUMENT[] = "document";
+-#endif
+-#endif
+ const char CameraParameters::SCENE_MODE_OFF[] = "off";
+ 
+ // Values for auto scene detection settings.
+@@ -276,18 +258,8 @@ const char CameraParameters::PIXEL_FORMAT_YUV420SP[] = "yuv420sp";
+ #ifdef QCOM_HARDWARE
+ const char CameraParameters::PIXEL_FORMAT_YUV420SP_ADRENO[] = "yuv420sp-adreno";
+ #endif
+-#ifdef STE_HARDWARE
+-const char CameraParameters::PIXEL_FORMAT_YUV420SPNV12[] = "yuv420spnv12";
+-#endif
+ const char CameraParameters::PIXEL_FORMAT_YUV422I[] = "yuv422i-yuyv";
+ const char CameraParameters::PIXEL_FORMAT_YUV420P[]  = "yuv420p";
+-#ifdef STE_HARDWARE
+-const char CameraParameters::PIXEL_FORMAT_YUV420MB[] = "yuv420mb";
+-const char CameraParameters::PIXEL_FORMAT_YVU422SP[] = "yvu422sp";
+-const char CameraParameters::PIXEL_FORMAT_YVU422P[] = "yvu422p";
+-const char CameraParameters::PIXEL_FORMAT_YVU420SP[] = "yvu420sp";
+-const char CameraParameters::PIXEL_FORMAT_YVU420P[]  = "yvu420p";
+-#endif
+ const char CameraParameters::PIXEL_FORMAT_RGB565[] = "rgb565";
+ const char CameraParameters::PIXEL_FORMAT_RGBA8888[] = "rgba8888";
+ const char CameraParameters::PIXEL_FORMAT_JPEG[] = "jpeg";
+@@ -306,7 +278,7 @@ const char CameraParameters::FOCUS_MODE_FIXED[] = "fixed";
+ const char CameraParameters::FOCUS_MODE_EDOF[] = "edof";
+ const char CameraParameters::FOCUS_MODE_CONTINUOUS_VIDEO[] = "continuous-video";
+ const char CameraParameters::FOCUS_MODE_CONTINUOUS_PICTURE[] = "continuous-picture";
+-#if defined(QCOM_HARDWARE)
++#ifdef QCOM_HARDWARE
+ const char CameraParameters::FOCUS_MODE_CONTINUOUS_CAMERA[] = "continuous-camera";
+ const char CameraParameters::FOCUS_MODE_NORMAL[] = "normal";
+ 
+@@ -322,24 +294,22 @@ const char CameraParameters::ISO_200[] = "ISO200";
+ const char CameraParameters::ISO_400[] = "ISO400";
+ const char CameraParameters::ISO_800[] = "ISO800";
+ const char CameraParameters::ISO_1600[] = "ISO1600";
+-const char CameraParameters::ISO_3200[] = "ISO3200";
+-const char CameraParameters::ISO_6400[] = "ISO6400";
+ 
+  //Values for Lens Shading
+ const char CameraParameters::LENSSHADE_ENABLE[] = "enable";
+ const char CameraParameters::LENSSHADE_DISABLE[] = "disable";
+ 
+ // Values for auto exposure settings.
++#ifdef SAMSUNG_CAMERA_QCOM
++const char CameraParameters::AUTO_EXPOSURE_FRAME_AVG[] = "matrix";
++const char CameraParameters::AUTO_EXPOSURE_CENTER_WEIGHTED[] = "center";
++const char CameraParameters::AUTO_EXPOSURE_SPOT_METERING[] = "spot";
++#else
+ const char CameraParameters::AUTO_EXPOSURE_FRAME_AVG[] = "frame-average";
+ const char CameraParameters::AUTO_EXPOSURE_CENTER_WEIGHTED[] = "center-weighted";
+ const char CameraParameters::AUTO_EXPOSURE_SPOT_METERING[] = "spot-metering";
+-
+-#ifdef QCOM_SONY_HARDWARE
+-const char CameraParameters::KEY_SEMC_METRY_MODE[] = "semc-metering-mode";
+-const char CameraParameters::SEMC_METRY_CENTER[] = "center-weighted";
+-const char CameraParameters::SEMC_METRY_FRAME[] = "frame-adverage";
+-const char CameraParameters::SEMC_METRY_SPOT[] = "spot";
+ #endif
++
+ const char CameraParameters::KEY_GPS_LATITUDE_REF[] = "gps-latitude-ref";
+ const char CameraParameters::KEY_GPS_LONGITUDE_REF[] = "gps-longitude-ref";
+ const char CameraParameters::KEY_GPS_ALTITUDE_REF[] = "gps-altitude-ref";
+@@ -357,26 +327,27 @@ const char CameraParameters::SKIN_TONE_ENHANCEMENT_ENABLE[] = "enable";
+ const char CameraParameters::SKIN_TONE_ENHANCEMENT_DISABLE[] = "disable";
+ 
+ const char CameraParameters::KEY_SHARPNESS[] = "sharpness";
+-#ifdef QCOM_HARDWARE
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+ const char CameraParameters::KEY_MAX_SHARPNESS[] = "sharpness-max";
+ const char CameraParameters::KEY_MIN_SHARPNESS[] = "sharpness-min";
+ #else
+ const char CameraParameters::KEY_MAX_SHARPNESS[] = "max-sharpness";
+ #endif
+ const char CameraParameters::KEY_CONTRAST[] = "contrast";
+-#ifdef QCOM_HARDWARE
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+ const char CameraParameters::KEY_MAX_CONTRAST[] = "contrast-max";
+ const char CameraParameters::KEY_MIN_CONTRAST[] = "contrast-min";
+ #else
+ const char CameraParameters::KEY_MAX_CONTRAST[] = "max-contrast";
+ #endif
+ const char CameraParameters::KEY_SATURATION[] = "saturation";
+-#ifdef QCOM_HARDWARE
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+ const char CameraParameters::KEY_MAX_SATURATION[] = "saturation-max";
+ const char CameraParameters::KEY_MIN_SATURATION[] = "saturation-min";
+ #else
+ const char CameraParameters::KEY_MAX_SATURATION[] = "max-saturation";
+ #endif
++
+ //Values for DENOISE
+ const char CameraParameters::DENOISE_OFF[] = "denoise-off";
+ const char CameraParameters::DENOISE_ON[] = "denoise-on";
+@@ -416,9 +387,28 @@ const char CameraParameters::AE_BRACKET_HDR_OFF[] = "Off";
+ const char CameraParameters::AE_BRACKET_HDR[] = "HDR";
+ const char CameraParameters::AE_BRACKET[] = "AE-Bracket";
+ 
+-#if defined(CAMERA_POWERMODE) || defined(QCOM_SONY_HARDWARE)
+-const char CameraParameters::LOW_POWER[] = "Low_Power";
+-const char CameraParameters::NORMAL_POWER[] = "Normal_Power";
++#ifdef SAMSUNG_CAMERA_QCOM
++const char CameraParameters::FOCUS_MODE_FACEDETECT[] = "facedetect";
++const char CameraParameters::FOCUS_MODE_TOUCHAF[] = "touchaf";
++const char CameraParameters::ISO_50[] = "ISO50";
++// const char CameraParameters::KEY_ANTI_SHAKE_MODE[] = "antishake";
++const char CameraParameters::KEY_AUTO_CONTRAST[] = "auto-contrast";
++const char CameraParameters::KEY_BEAUTY_MODE[] = "beauty";
++const char CameraParameters::KEY_BLUR_MODE[] = "blur";
++const char CameraParameters::KEY_VINTAGE_MODE[] = "vintagemode";
++const char CameraParameters::KEY_WDR_MODE[] = "wdr";
++const char CameraParameters::VINTAGE_MODE_BNW[] = "bnw";
++const char CameraParameters::VINTAGE_MODE_COOL[] = "cool";
++const char CameraParameters::VINTAGE_MODE_NORMAL[] = "normal";
++const char CameraParameters::VINTAGE_MODE_OFF[] = "off";
++const char CameraParameters::VINTAGE_MODE_WARM[] = "warm";
++const char CameraParameters::SCENE_MODE_BACKLIGHT[] = "back-light";
++const char CameraParameters::SCENE_MODE_DAWN[] = "dusk-dawn";
++const char CameraParameters::SCENE_MODE_DUSKDAWN[] = "dusk-dawn";
++const char CameraParameters::SCENE_MODE_FALL[] = "fall-color";
++const char CameraParameters::SCENE_MODE_FALL_COLOR[] = "fall-color";
++const char CameraParameters::SCENE_MODE_FLOWERS[] = "flowers";
++const char CameraParameters::SCENE_MODE_TEXT[] = "text";
+ #endif
+ 
+ static const char* portrait = "portrait";
+@@ -441,11 +431,6 @@ void CameraParameters::setOrientation(int orientation)
+ }
+ #endif
+ 
+-#ifdef STE_HARDWARE
+-// keys for record stride and sliceheight
+-const char CameraParameters::KEY_RECORD_STRIDE[] = "record-stride";
+-const char CameraParameters::KEY_RECORD_SLICE_HEIGHT[] = "record-slice-height";
+-#endif
+ 
+ CameraParameters::CameraParameters()
+                 : mMap()
+@@ -513,12 +498,12 @@ void CameraParameters::set(const char *key, const char *value)
+ {
+     // XXX i think i can do this with strspn()
+     if (strchr(key, '=') || strchr(key, ';')) {
+-        //XXX ALOGE("Key \"%s\"contains invalid character (= or ;)", key);
++        //XXX ALOGD("Key \"%s\"contains invalid character (= or ;)", key);
+         return;
+     }
+ 
+     if (strchr(value, '=') || strchr(key, ';')) {
+-        //XXX ALOGE("Value \"%s\"contains invalid character (= or ;)", value);
++        //XXX ALOGD("Value \"%s\"contains invalid character (= or ;)", value);
+         return;
+     }
+ 
+@@ -576,7 +561,7 @@ static int parse_pair(const char *str, int *first, int *second, char delim,
+     int w = (int)strtol(str, &end, 10);
+     // If a delimeter does not immediately follow, give up.
+     if (*end != delim) {
+-        ALOGE("Cannot find delimeter (%c) in str=%s", delim, str);
++        ALOGD("Cannot find delimeter (%c) in str=%s", delim, str);
+         return -1;
+     }
+ 
+@@ -599,12 +584,12 @@ static int parseNDimVector(const char *str, int *num, int N, char delim = ',')
+ {
+     char *start, *end;
+     if(num == NULL) {
+-        ALOGE("Invalid output array (num == NULL)");
++        ALOGD("Invalid output array (num == NULL)");
+         return -1;
+     }
+     //check if string starts and ends with parantheses
+     if(str[0] != '(' || str[strlen(str)-1] != ')') {
+-        ALOGE("Invalid format of string %s, valid format is (n1, n2, n3, n4 ...)", str);
++        ALOGD("Invalid format of string %s, valid format is (n1, n2, n3, n4 ...)", str);
+         return -1;
+     }
+     start = (char*) str;
+@@ -612,7 +597,7 @@ static int parseNDimVector(const char *str, int *num, int N, char delim = ',')
+     for(int i=0; i<N; i++) {
+         *(num+i) = (int) strtol(start, &end, 10);
+         if(*end != delim && i < N-1) {
+-            ALOGE("Cannot find delimeter '%c' in string \"%s\". end = %c", delim, str, *end);
++            ALOGD("Cannot find delimeter '%c' in string \"%s\". end = %c", delim, str, *end);
+             return -1;
+         }
+         start = end+1;
+@@ -632,7 +617,7 @@ static void parseSizesList(const char *sizesStr, Vector<Size> &sizes)
+         int success = parse_pair(sizeStartPtr, &width, &height, 'x',
+                                  &sizeStartPtr);
+         if (success == -1 || (*sizeStartPtr != ',' && *sizeStartPtr != '\0')) {
+-            ALOGE("Picture sizes string \"%s\" contains invalid character.", sizesStr);
++            ALOGD("Picture sizes string \"%s\" contains invalid character.", sizesStr);
+             return;
+         }
+         sizes.push(Size(width, height));
+@@ -675,12 +660,6 @@ void CameraParameters::getSupportedPreviewSizes(Vector<Size> &sizes) const
+ }
+ 
+ #ifdef QCOM_HARDWARE
+-void CameraParameters::setPostviewSize(int width, int height)
+-{
+-    // dummy
+-}
+-
+-
+ void CameraParameters::getSupportedHfrSizes(Vector<Size> &sizes) const
+ {
+     const char *hfrSizesStr = get(KEY_SUPPORTED_HFR_SIZES);
+@@ -693,6 +672,11 @@ void CameraParameters::setPreviewFpsRange(int minFPS, int maxFPS)
+     snprintf(str, sizeof(str), "%d,%d",minFPS,maxFPS);
+     set(KEY_PREVIEW_FPS_RANGE,str);
+ }
++
++void CameraParameters::setPostviewSize(int width, int height)
++{
++    // dummy
++}
+ #endif
+ 
+ void CameraParameters::setVideoSize(int width, int height)
+@@ -846,12 +830,6 @@ void CameraParameters::getMeteringAreaCenter(int *x, int *y) const
+     }
+ }
+ 
+-#ifdef QCOM_SONY_HARDWARE
+-void CameraParameters::getFocusAreaCenter(int *x, int *y) const
+-{
+-    // dummy
+-}
+-#endif
+ void CameraParameters::getTouchIndexAf(int *x, int *y) const
+ {
+     *x = -1;
+@@ -889,3 +867,4 @@ status_t CameraParameters::dump(int fd, const Vector<String16>& args) const
+ }
+ 
+ }; // namespace android
++
+diff --git a/include/camera/CameraParameters.h b/include/camera/CameraParameters.h
+index a871f0f..aac5009 100644
+--- a/include/camera/CameraParameters.h
++++ b/include/camera/CameraParameters.h
+@@ -158,9 +158,8 @@ public:
+     // Example value: "(10500,26623),(15000,26623),(30000,30000)"
+     static const char KEY_SUPPORTED_PREVIEW_FPS_RANGE[];
+     // The image format for preview frames. See CAMERA_MSG_PREVIEW_FRAME in
+-    // frameworks/av/include/camera/Camera.h. The default is
+-    // PIXEL_FORMAT_YUV420SP. Example value: "yuv420sp" or PIXEL_FORMAT_XXX
+-    // constants. Read/write.
++    // system/core/include/system/camera.h.
++    // Example value: "yuv420sp" or PIXEL_FORMAT_XXX constants. Read/write.
+     static const char KEY_PREVIEW_FORMAT[];
+     // Supported image formats for preview frames.
+     // Example value: "yuv420sp,yuv422i-yuyv". Read only.
+@@ -199,7 +198,7 @@ public:
+     // Example value: "2048x1536,1024x768". Read only.
+     static const char KEY_SUPPORTED_PICTURE_SIZES[];
+     // The image format for captured pictures. See CAMERA_MSG_COMPRESSED_IMAGE
+-    // in frameworks/base/include/camera/Camera.h.
++    // in system/core/include/system/camera.h.
+     // Example value: "jpeg" or PIXEL_FORMAT_XXX constants. Read/write.
+     static const char KEY_PICTURE_FORMAT[];
+     // Supported image formats for captured pictures.
+@@ -483,7 +482,7 @@ public:
+     // value is "true". It is not supported if the value is not "true" or the
+     // key does not exist.
+     // See CAMERA_CMD_START_SMOOTH_ZOOM, CAMERA_CMD_STOP_SMOOTH_ZOOM, and
+-    // CAMERA_MSG_ZOOM in frameworks/base/include/camera/Camera.h.
++    // CAMERA_MSG_ZOOM in system/core/include/system/camera.h.
+     // Example value: "true". Read only.
+     static const char KEY_SMOOTH_ZOOM_SUPPORTED[];
+ 
+@@ -517,7 +516,7 @@ public:
+     static const char KEY_VIDEO_SIZE[];
+     // A list of the supported dimensions in pixels (width x height)
+     // for video frames. See CAMERA_MSG_VIDEO_FRAME for details in
+-    // frameworks/base/include/camera/Camera.h.
++    // system/core/include/system/camera.h.
+     // Example: "176x144,1280x720". Read only.
+     static const char KEY_SUPPORTED_VIDEO_SIZES[];
+ 
+@@ -546,7 +545,7 @@ public:
+     static const char KEY_PREFERRED_PREVIEW_SIZE_FOR_VIDEO[];
+ 
+     // The image format for video frames. See CAMERA_MSG_VIDEO_FRAME in
+-    // frameworks/base/include/camera/Camera.h.
++    // system/core/include/system/camera.h.
+     // Example value: "yuv420sp" or PIXEL_FORMAT_XXX constants. Read only.
+     static const char KEY_VIDEO_FRAME_FORMAT[];
+ 
+@@ -580,14 +579,6 @@ public:
+     // Example value: "true" or "false". Read only.
+     static const char KEY_VIDEO_SNAPSHOT_SUPPORTED[];
+     static const char KEY_FULL_VIDEO_SNAP_SUPPORTED[];
+-#if defined(CAMERA_POWERMODE) || defined(QCOM_SONY_HARDWARE)
+-    static const char KEY_POWER_MODE_SUPPORTED[];
+-#endif
+-
+-#if defined(QCOM_HARDWARE) || defined(EXYNOS4X12_ENHANCEMENTS) || defined(HAVE_ISO)
+-    static const char KEY_SUPPORTED_ISO_MODES[];
+-    static const char KEY_ISO_MODE[];
+-#endif
+ 
+ #ifdef QCOM_HARDWARE
+     static const char KEY_LENSSHADE[] ;
+@@ -601,6 +592,10 @@ public:
+     static const char KEY_GPS_ALTITUDE_REF[];
+     static const char KEY_GPS_STATUS[];
+     static const char KEY_EXIF_DATETIME[];
++#ifndef SAMSUNG_CAMERA_HARDWARE
++    static const char KEY_ISO_MODE[];
++    static const char KEY_SUPPORTED_ISO_MODES[];
++#endif
+ #endif
+ 
+     // The state of the video stabilization. If set to true, both the
+@@ -621,10 +616,6 @@ public:
+     static const char KEY_MEMORY_COLOR_ENHANCEMENT[];
+     static const char KEY_SUPPORTED_MEM_COLOR_ENHANCE_MODES[];
+ 
+-#if defined(CAMERA_POWERMODE) || defined(QCOM_SONY_HARDWARE)
+-    static const char KEY_POWER_MODE[];
+-#endif
+-
+     static const char KEY_ZSL[];
+     static const char KEY_SUPPORTED_ZSL_MODES[];
+ 
+@@ -668,10 +659,11 @@ public:
+ #endif
+ 
+ #ifdef SAMSUNG_CAMERA_HARDWARE
+-    static const char KEY_ANTI_SHAKE_MODE[];
+     static const char KEY_METERING[];
+     static const char KEY_WDR[];
+-    static const char KEY_WEATHER[];
++    static const char KEY_ANTI_SHAKE_MODE[];
++    static const char KEY_ISO_MODE[];
++    static const char KEY_SUPPORTED_ISO_MODES[];
+ #endif
+ 
+     // Values for white balance settings.
+@@ -742,23 +734,10 @@ public:
+     static const char SCENE_MODE_SPORTS[];
+     static const char SCENE_MODE_PARTY[];
+     static const char SCENE_MODE_CANDLELIGHT[];
+-#ifdef STE_SAMSUNG_HARDWARE
+-    static const char SCENE_MODE_BACKLIGHT[];
+-    static const char SCENE_MODE_DUSKDAWN[];
+-    static const char SCENE_MODE_FALLCOLOR[];
+-    static const char SCENE_MODE_TEXT[];
+-#endif
+ #ifdef QCOM_HARDWARE
+     static const char SCENE_MODE_BACKLIGHT[];
+     static const char SCENE_MODE_FLOWERS[];
+     static const char SCENE_MODE_AR[];
+-#ifdef QCOM_SONY_HARDWARE
+-#ifdef QCOM_SONY_NEW_CAMERA
+-    static const char SCENE_MODE_DOCUMENT[];
+-#else
+-    static const char EX_SCENE_MODE_DOCUMENT[];
+-#endif
+-#endif
+     static const char SCENE_MODE_OFF[];
+ #endif
+     // Applications are looking for a barcode. Camera driver will be optimized
+@@ -776,18 +755,8 @@ public:
+ #ifdef QCOM_HARDWARE
+     static const char PIXEL_FORMAT_YUV420SP_ADRENO[]; // ADRENO
+ #endif
+-#ifdef STE_HARDWARE
+-    static const char PIXEL_FORMAT_YUV420SPNV12[]; // NV12
+-#endif
+     static const char PIXEL_FORMAT_YUV422I[]; // YUY2
+     static const char PIXEL_FORMAT_YUV420P[]; // YV12
+-#ifdef STE_HARDWARE
+-    static const char PIXEL_FORMAT_YVU422SP[];
+-    static const char PIXEL_FORMAT_YVU422P[];
+-    static const char PIXEL_FORMAT_YVU420SP[];
+-    static const char PIXEL_FORMAT_YVU420P[];
+-    static const char PIXEL_FORMAT_YUV420MB[];
+-#endif
+     static const char PIXEL_FORMAT_RGB565[];
+     static const char PIXEL_FORMAT_RGBA8888[];
+     static const char PIXEL_FORMAT_JPEG[];
+@@ -873,8 +842,6 @@ public:
+     static const char ISO_400[];
+     static const char ISO_800[];
+     static const char ISO_1600[];
+-    static const char ISO_3200[];
+-    static const char ISO_6400[];
+     // Values for Lens Shading
+     static const char LENSSHADE_ENABLE[] ;
+     static const char LENSSHADE_DISABLE[] ;
+@@ -886,13 +853,19 @@ public:
+ 
+     static const char KEY_SHARPNESS[];
+     static const char KEY_MAX_SHARPNESS[];
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+     static const char KEY_MIN_SHARPNESS[];
++#endif
+     static const char KEY_CONTRAST[];
+     static const char KEY_MAX_CONTRAST[];
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+     static const char KEY_MIN_CONTRAST[];
++#endif
+     static const char KEY_SATURATION[];
+     static const char KEY_MAX_SATURATION[];
++#if defined(QCOM_HARDWARE) && !defined(SAMSUNG_CAMERA_QCOM)
+     static const char KEY_MIN_SATURATION[];
++#endif
+ 
+     static const char KEY_HISTOGRAM[] ;
+     static const char KEY_SUPPORTED_HISTOGRAM_MODES[] ;
+@@ -914,7 +887,6 @@ public:
+     static const char SELECTABLE_ZONE_AF_CENTER_WEIGHTED[];
+     static const char SELECTABLE_ZONE_AF_FRAME_AVERAGE[];
+ 
+-
+     // Values for Face Detection settings.
+     static const char FACE_DETECTION_OFF[];
+     static const char FACE_DETECTION_ON[];
+@@ -932,10 +904,6 @@ public:
+     static const char AE_BRACKET_HDR[];
+     static const char AE_BRACKET[];
+ 
+-#if defined(CAMERA_POWERMODE) || defined(QCOM_SONY_HARDWARE)
+-    static const char LOW_POWER[];
+-    static const char NORMAL_POWER[];
+-#endif
+     // Values for HFR settings.
+     static const char VIDEO_HFR_OFF[];
+     static const char VIDEO_HFR_2X[];
+@@ -949,14 +917,6 @@ public:
+     static const char HDR_ENABLE[];
+     static const char HDR_DISABLE[];
+ 
+-#ifdef QCOM_SONY_HARDWARE
+-    static const char KEY_EX_SUPPORTED_METERING_MODES[];
+-    static const char KEY_SEMC_METRY_MODE[];
+-    static const char SEMC_METRY_CENTER[];
+-    static const char SEMC_METRY_FRAME[];
+-    static const char SEMC_METRY_SPOT[];
+-#endif
+-
+    // Values for Redeye Reduction settings.
+    // static const char REDEYE_REDUCTION_ENABLE[];
+    // static const char REDEYE_REDUCTION_DISABLE[];
+@@ -972,16 +932,30 @@ public:
+     int getOrientation() const;
+     void setOrientation(int orientation);
+     void setPreviewFpsRange(int minFPS,int maxFPS);
+-    void setPostviewSize(int x, int y);
++    void setPostviewSize(int x,int y);
+     void getSupportedHfrSizes(Vector<Size> &sizes) const;
+-#ifdef QCOM_SONY_HARDWARE
+-    void getFocusAreaCenter(int *x, int *y) const;
+-#endif
+ #endif
+-#ifdef STE_HARDWARE
+-    // keys for record stride and slice height
+-    static const char KEY_RECORD_STRIDE[];
+-    static const char KEY_RECORD_SLICE_HEIGHT[];
++
++#ifdef SAMSUNG_CAMERA_QCOM
++    static const char FOCUS_MODE_FACEDETECT[];
++    static const char FOCUS_MODE_TOUCHAF[];
++    static const char ISO_50[];
++//    static const char KEY_ANTI_SHAKE_MODE[];
++    static const char KEY_AUTO_CONTRAST[];
++    static const char KEY_BEAUTY_MODE[];
++    static const char KEY_BLUR_MODE[];
++    static const char KEY_VINTAGE_MODE[];
++    static const char KEY_WDR_MODE[];
++    static const char VINTAGE_MODE_BNW[];
++    static const char VINTAGE_MODE_COOL[];
++    static const char VINTAGE_MODE_NORMAL[];
++    static const char VINTAGE_MODE_OFF[];
++    static const char VINTAGE_MODE_WARM[];
++    static const char SCENE_MODE_DAWN[];
++    static const char SCENE_MODE_DUSKDAWN[];
++    static const char SCENE_MODE_FALL[];
++    static const char SCENE_MODE_FALL_COLOR[];
++    static const char SCENE_MODE_TEXT[];
+ #endif
+ 
+ private:
+@@ -991,3 +965,4 @@ private:
+ }; // namespace android
+ 
+ #endif
++
+diff --git a/include/camera/QCameraParameters.h b/include/camera/QCameraParameters.h
+index 4d0bdf3..44a4432 100755
+--- a/include/camera/QCameraParameters.h
++++ b/include/camera/QCameraParameters.h
+@@ -150,8 +150,6 @@ public:
+     static const char ISO_400[];
+     static const char ISO_800[];
+     static const char ISO_1600[];
+-    static const char ISO_3200[];
+-    static const char ISO_6400[];
+     // Values for Lens Shading
+     static const char LENSSHADE_ENABLE[] ;
+     static const char LENSSHADE_DISABLE[] ;
+diff --git a/include/media/AudioParameter.h b/include/media/AudioParameter.h
+index 3fea008..72407bc 100644
+--- a/include/media/AudioParameter.h
++++ b/include/media/AudioParameter.h
+@@ -53,9 +53,6 @@ public:
+     static const char * const keyVoipCheck;
+     static const char * const keyFluenceType;
+     static const char * const keyHandleA2dpDevice;
+-#ifdef STE_AUDIO
+-    static const char *keySinkLatency;
+-#endif
+ 
+     String8 toString();
+ 
+diff --git a/include/media/AudioRecord.h b/include/media/AudioRecord.h
+index d6ac1b4..85cbcea 100644
+--- a/include/media/AudioRecord.h
++++ b/include/media/AudioRecord.h
+@@ -402,9 +402,6 @@ private:
+     int                     mSessionId;
+     int                     mPreviousPriority;          // before start()
+     SchedPolicy             mPreviousSchedulingGroup;
+-#ifdef STE_AUDIO
+-    audio_input_clients     *mpInputClientId;
+-#endif
+ };
+ 
+ }; // namespace android
+diff --git a/include/media/AudioSystem.h b/include/media/AudioSystem.h
+index 3976ac1..058e384 100644
+--- a/include/media/AudioSystem.h
++++ b/include/media/AudioSystem.h
+@@ -30,9 +30,6 @@
+ namespace android {
+ 
+ typedef void (*audio_error_callback)(status_t err);
+-#ifdef STE_AUDIO
+-typedef void (*latency_update_callback)(void *cookie, audio_io_handle_t output, uint32_t sinkLatency);
+-#endif
+ 
+ class IAudioPolicyService;
+ class String8;
+@@ -138,11 +135,6 @@ public:
+     static void acquireAudioSessionId(int audioSession);
+     static void releaseAudioSessionId(int audioSession);
+ 
+-#ifdef STE_AUDIO
+-    static int registerLatencyNotificationClient(latency_update_callback cb, void *cookie, audio_io_handle_t output);
+-    static void unregisterLatencyNotificationClient(int clientId);
+-#endif
+-
+     // types of io configuration change events received with ioConfigChanged()
+     enum io_config_event {
+         OUTPUT_OPENED,
+@@ -156,9 +148,6 @@ public:
+         A2DP_OUTPUT_STATE,
+         EFFECT_CONFIG_CHANGED,
+ #endif
+-#ifdef STE_AUDIO
+-        SINK_LATENCY_CHANGED,
+-#endif
+         NUM_CONFIG_EVENTS
+     };
+ 
+@@ -220,12 +209,7 @@ public:
+                                     audio_format_t format = AUDIO_FORMAT_DEFAULT,
+                                     uint32_t channels = AUDIO_CHANNEL_IN_MONO,
+                                     audio_in_acoustics_t acoustics = (audio_in_acoustics_t)0,
+-#ifdef STE_AUDIO
+-                                    int sessionId = 0,
+-                                    audio_input_clients *inputClientId = NULL);
+-#else
+                                     int sessionId = 0);
+-#endif
+     static status_t startInput(audio_io_handle_t input);
+     static status_t stopInput(audio_io_handle_t input);
+     static void releaseInput(audio_io_handle_t input);
+@@ -287,14 +271,6 @@ private:
+         virtual void binderDied(const wp<IBinder>& who);
+     };
+ 
+-#ifdef STE_AUDIO
+-    struct NotificationClient : public RefBase {
+-        latency_update_callback mCb;
+-        void *mCookie;
+-        audio_io_handle_t mOutput;
+-    };
+-#endif
+-
+     static sp<AudioFlingerClient> gAudioFlingerClient;
+     static sp<AudioPolicyServiceClient> gAudioPolicyServiceClient;
+     friend class AudioFlingerClient;
+@@ -317,12 +293,6 @@ private:
+     // list of output descriptors containing cached parameters
+     // (sampling rate, framecount, channel count...)
+     static DefaultKeyedVector<audio_io_handle_t, OutputDescriptor *> gOutputs;
+-
+-#ifdef STE_AUDIO
+-    static Mutex gLatencyLock;
+-    static int gNextUniqueLatencyId;
+-    static DefaultKeyedVector<int, sp<AudioSystem::NotificationClient> > gLatencyNotificationClients;
+-#endif
+ };
+ 
+ };  // namespace android
+diff --git a/include/media/AudioTrack.h b/include/media/AudioTrack.h
+index 1d5d4ea..c26904e 100644
+--- a/include/media/AudioTrack.h
++++ b/include/media/AudioTrack.h
+@@ -63,12 +63,7 @@ public:
+         EVENT_LOOP_END = 2,         // Sample loop end was reached; playback restarted from loop start if loop count was not 0.
+         EVENT_MARKER = 3,           // Playback head is at the specified marker position (See setMarkerPosition()).
+         EVENT_NEW_POS = 4,          // Playback head is at a new position (See setPositionUpdatePeriod()).
+-#ifdef STE_AUDIO
+-        EVENT_BUFFER_END = 5,       // Playback head is at the end of the buffer.
+-        EVENT_LATENCY_CHANGED = 6   // Audio sink latency has changed.
+-#else
+         EVENT_BUFFER_END = 5        // Playback head is at the end of the buffer.
+-#endif
+     };
+ 
+     /* Client should declare Buffer on the stack and pass address to obtainBuffer()
+@@ -513,10 +508,6 @@ protected:
+             audio_io_handle_t getOutput_l();
+             status_t restoreTrack_l(audio_track_cblk_t*& cblk, bool fromStart);
+             bool stopped_l() const { return !mActive; }
+-#ifdef STE_AUDIO
+-            static void LatencyCallback(void *cookie, audio_io_handle_t output,
+-                                 uint32_t sinkLatency);
+-#endif
+ 
+ #ifdef QCOM_HARDWARE
+     sp<IDirectTrack>        mDirectTrack;
+@@ -568,9 +559,6 @@ protected:
+     bool                    mIsTimed;
+     int                     mPreviousPriority;          // before start()
+     SchedPolicy             mPreviousSchedulingGroup;
+-#ifdef STE_AUDIO
+-    int                     mLatencyClientId;
+-#endif
+ };
+ 
+ class TimedAudioTrack : public AudioTrack
+diff --git a/include/media/IAudioFlinger.h b/include/media/IAudioFlinger.h
+index 9c0c895..bd98666 100644
+--- a/include/media/IAudioFlinger.h
++++ b/include/media/IAudioFlinger.h
+@@ -161,26 +161,12 @@ public:
+     virtual status_t suspendOutput(audio_io_handle_t output) = 0;
+     virtual status_t restoreOutput(audio_io_handle_t output) = 0;
+ 
+-#ifdef STE_AUDIO
+-    virtual uint32_t *addInputClient(uint32_t clientId) = 0;
+-    virtual status_t removeInputClient(uint32_t *pClientId) = 0;
+-
+-    virtual audio_io_handle_t openInput(audio_module_handle_t module,
+-                                        audio_devices_t *pDevices,
+-                                        uint32_t *pSamplingRate,
+-                                        audio_format_t *pFormat,
+-                                        audio_channel_mask_t *pChannelMask,
+-                                        audio_input_clients *inputClientId = NULL) = 0;
+-    virtual status_t closeInput(audio_io_handle_t input,
+-                                audio_input_clients *inputClientId = NULL) = 0;
+-#else
+     virtual audio_io_handle_t openInput(audio_module_handle_t module,
+                                         audio_devices_t *pDevices,
+                                         uint32_t *pSamplingRate,
+                                         audio_format_t *pFormat,
+                                         audio_channel_mask_t *pChannelMask) = 0;
+     virtual status_t closeInput(audio_io_handle_t input) = 0;
+-#endif
+ 
+     virtual status_t setStreamOutput(audio_stream_type_t stream, audio_io_handle_t output) = 0;
+ 
+@@ -215,13 +201,6 @@ public:
+ 
+     virtual status_t moveEffects(int session, audio_io_handle_t srcOutput,
+                                     audio_io_handle_t dstOutput) = 0;
+-#ifdef STE_AUDIO
+-    virtual size_t readInput(audio_io_handle_t input,
+-                            audio_input_clients inputClientId,
+-                            void *buffer,
+-                            uint32_t bytes,
+-                            uint32_t *pOverwrittenBytes) = 0;
+-#endif
+ 
+     virtual audio_module_handle_t loadHwModule(const char *name) = 0;
+ #ifdef QCOM_HARDWARE
+diff --git a/include/media/IAudioPolicyService.h b/include/media/IAudioPolicyService.h
+index fa8a4bb..e160d70 100644
+--- a/include/media/IAudioPolicyService.h
++++ b/include/media/IAudioPolicyService.h
+@@ -65,12 +65,7 @@ public:
+                                     audio_format_t format = AUDIO_FORMAT_DEFAULT,
+                                     uint32_t channels = 0,
+                                     audio_in_acoustics_t acoustics = (audio_in_acoustics_t)0,
+-#ifdef STE_AUDIO
+-                                    int audioSession = 0,
+-                                    audio_input_clients *inputClientId = NULL) = 0;
+-#else
+                                     int audioSession = 0) = 0;
+-#endif
+     virtual status_t startInput(audio_io_handle_t input) = 0;
+     virtual status_t stopInput(audio_io_handle_t input) = 0;
+     virtual void releaseInput(audio_io_handle_t input) = 0;
+diff --git a/include/media/stagefright/ColorConverter.h b/include/media/stagefright/ColorConverter.h
+index f5a1d98..a248222 100644
+--- a/include/media/stagefright/ColorConverter.h
++++ b/include/media/stagefright/ColorConverter.h
+@@ -74,11 +74,6 @@ private:
+     status_t convertQCOMYUV420SemiPlanar(
+             const BitmapParams &src, const BitmapParams &dst);
+ 
+-#ifdef STE_HARDWARE
+-    status_t convertSTEYUV420PackedSemiPlanarMB(
+-            const BitmapParams &src, const BitmapParams &dst);
+-#endif
+-
+     status_t convertYUV420SemiPlanar(
+             const BitmapParams &src, const BitmapParams &dst);
+ 
+diff --git a/include/media/stagefright/MediaDefs.h b/include/media/stagefright/MediaDefs.h
+index 07e9a28..d0dd7cc 100644
+--- a/include/media/stagefright/MediaDefs.h
++++ b/include/media/stagefright/MediaDefs.h
+@@ -27,14 +27,9 @@ extern const char *MEDIA_MIMETYPE_VIDEO_VPX;
+ extern const char *MEDIA_MIMETYPE_VIDEO_AVC;
+ extern const char *MEDIA_MIMETYPE_VIDEO_MPEG4;
+ extern const char *MEDIA_MIMETYPE_VIDEO_H263;
+-#ifdef STE_HARDWARE
+-extern const char *MEDIA_MIMETYPE_VIDEO_H263_SW;
+-#endif
+ extern const char *MEDIA_MIMETYPE_VIDEO_MPEG2;
+ extern const char *MEDIA_MIMETYPE_VIDEO_RAW;
+-#ifdef STE_HARDWARE
+-extern const char *MEDIA_MIMETYPE_VIDEO_VC1;
+-#endif
++
+ extern const char *MEDIA_MIMETYPE_AUDIO_AMR_NB;
+ extern const char *MEDIA_MIMETYPE_AUDIO_AMR_WB;
+ extern const char *MEDIA_MIMETYPE_AUDIO_MPEG;           // layer III
+diff --git a/include/media/stagefright/OMXCodec.h b/include/media/stagefright/OMXCodec.h
+index 09160fd..cb21bf0 100644
+--- a/include/media/stagefright/OMXCodec.h
++++ b/include/media/stagefright/OMXCodec.h
+@@ -98,10 +98,6 @@ struct OMXCodec : public MediaSource,
+     // from MediaBufferObserver
+     virtual void signalBufferReturned(MediaBuffer *buffer);
+ 
+-#ifdef STE_HARDWARE
+-    static uint32_t OmxToHALFormat(OMX_COLOR_FORMATTYPE omxValue);
+-#endif
+-
+     enum Quirks {
+         kNeedsFlushBeforeDisable              = 1,
+         kWantsNALFragments                    = 2,
+@@ -121,9 +117,6 @@ struct OMXCodec : public MediaSource,
+         kRequiresGlobalFlush                  = 0x20000000, // 2^29
+         kRequiresWMAProComponent              = 0x40000000, //2^30
+ #endif
+-#ifdef STE_HARDWARE
+-        kRequiresStoreMetaDataBeforeIdle      = 16384,
+-#endif
+     };
+ 
+     // for use by ACodec
+diff --git a/media/libmedia/AudioParameter.cpp b/media/libmedia/AudioParameter.cpp
+index 348d452..4b134b9 100644
+--- a/media/libmedia/AudioParameter.cpp
++++ b/media/libmedia/AudioParameter.cpp
+@@ -39,9 +39,6 @@ const char * const AudioParameter::keyVoipCheck = AUDIO_PARAMETER_KEY_VOIP_CHECK
+ const char * const AudioParameter::keyFluenceType = AUDIO_PARAMETER_KEY_FLUENCE_TYPE;
+ const char * const AudioParameter::keyHandleA2dpDevice = AUDIO_PARAMETER_KEY_HANDLE_A2DP_DEVICE;
+ #endif
+-#ifdef STE_AUDIO
+-const char *AudioParameter::keySinkLatency = "sink_latency";
+-#endif
+ 
+ AudioParameter::AudioParameter(const String8& keyValuePairs)
+ {
+diff --git a/media/libmedia/AudioRecord.cpp b/media/libmedia/AudioRecord.cpp
+index c848718..1238de5 100644
+--- a/media/libmedia/AudioRecord.cpp
++++ b/media/libmedia/AudioRecord.cpp
+@@ -80,18 +80,8 @@ status_t AudioRecord::getMinFrameCount(
+ 
+ AudioRecord::AudioRecord()
+     : mStatus(NO_INIT), mSessionId(0),
+-#ifdef STE_AUDIO
+-      mpInputClientId(NULL),
+-#endif
+       mPreviousPriority(ANDROID_PRIORITY_NORMAL), mPreviousSchedulingGroup(SP_DEFAULT)
+ {
+-#ifdef STE_AUDIO
+-    const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
+-    if (audioFlinger != 0) {
+-        mpInputClientId = (audio_input_clients*)audioFlinger->addInputClient(
+-                                                 (uint32_t)AUDIO_INPUT_CLIENT_RECORD);
+-    }
+-#endif
+ }
+ 
+ AudioRecord::AudioRecord(
+@@ -106,19 +96,8 @@ AudioRecord::AudioRecord(
+         int notificationFrames,
+         int sessionId)
+     : mStatus(NO_INIT), mSessionId(0),
+-#ifdef STE_AUDIO
+-      mpInputClientId(NULL),
+-#endif
+       mPreviousPriority(ANDROID_PRIORITY_NORMAL), mPreviousSchedulingGroup(SP_DEFAULT)
+ {
+-#ifdef STE_AUDIO
+-    const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
+-    if (audioFlinger != 0) {
+-        mpInputClientId = (audio_input_clients*)audioFlinger->addInputClient(
+-                                                 (uint32_t)AUDIO_INPUT_CLIENT_RECORD);
+-    }
+-#endif
+-
+     mStatus = set(inputSource, sampleRate, format, channelMask,
+             frameCount, flags, cbf, user, notificationFrames, sessionId);
+ }
+@@ -170,12 +149,6 @@ AudioRecord::~AudioRecord()
+         IPCThreadState::self()->flushCommands();
+         AudioSystem::releaseAudioSessionId(mSessionId);
+     }
+-#ifdef STE_AUDIO
+-    const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
+-    if (audioFlinger != 0) {
+-        audioFlinger->removeInputClient((uint32_t*)mpInputClientId);
+-    }
+-#endif
+ }
+ 
+ status_t AudioRecord::set(
+@@ -239,12 +212,7 @@ status_t AudioRecord::set(
+                                                     format,
+                                                     channelMask,
+                                                     (audio_in_acoustics_t)flags,
+-#ifdef STE_AUDIO
+-                                                    mSessionId,
+-                                                    mpInputClientId);
+-#else
+                                                     mSessionId);
+-#endif
+     if (input == 0) {
+         ALOGE("Could not get audio input for record source %d", inputSource);
+         return BAD_VALUE;
+@@ -315,9 +283,7 @@ status_t AudioRecord::set(
+         notificationFrames = frameCount/2;
+     }
+ 
+-#ifndef STE_AUDIO
+     mInputSource = inputSource;
+-#endif
+     // create the IAudioRecord
+ #ifdef QCOM_HARDWARE
+     status_t status = openRecord_l(sampleRate, format, channelMask,
+@@ -353,9 +319,6 @@ status_t AudioRecord::set(
+     mMarkerReached = false;
+     mNewPosition = 0;
+     mUpdatePeriod = 0;
+-#ifdef STE_AUDIO
+-    mInputSource = inputSource;
+-#endif
+     mFlags = flags;
+     mInput = input;
+ #ifdef QCOM_HARDWARE
+diff --git a/media/libmedia/AudioSystem.cpp b/media/libmedia/AudioSystem.cpp
+index 11f7369..2acd446 100644
+--- a/media/libmedia/AudioSystem.cpp
++++ b/media/libmedia/AudioSystem.cpp
+@@ -44,12 +44,6 @@ audio_format_t AudioSystem::gPrevInFormat = AUDIO_FORMAT_PCM_16_BIT;
+ int AudioSystem::gPrevInChannelCount = 1;
+ size_t AudioSystem::gInBuffSize = 0;
+ 
+-#ifdef STE_AUDIO
+-// Clients for receiving latency update notifications
+-Mutex AudioSystem::gLatencyLock;
+-int AudioSystem::gNextUniqueLatencyId = 0;
+-DefaultKeyedVector<int, sp<AudioSystem::NotificationClient> > AudioSystem::gLatencyNotificationClients(0);
+-#endif
+ 
+ // establish binder interface to AudioFlinger service
+ const sp<IAudioFlinger>& AudioSystem::get_audio_flinger()
+@@ -425,36 +419,10 @@ status_t AudioSystem::setFmVolume(float value)
+     return af->setFmVolume(value);
+ }
+ #endif
+-#ifdef STE_AUDIO
+-int AudioSystem::registerLatencyNotificationClient(latency_update_callback cb,
+-        void *cookie, audio_io_handle_t output) {
+-    Mutex::Autolock _l(gLatencyLock);
+-
+-    sp<NotificationClient> notificationClient = new NotificationClient();
+-    notificationClient->mCb = cb;
+-    notificationClient->mCookie = cookie;
+-    notificationClient->mOutput = output;
+-
+-    gNextUniqueLatencyId++;
+-    gLatencyNotificationClients.add(gNextUniqueLatencyId, notificationClient);
+-    return gNextUniqueLatencyId;
+-}
+-
+-void AudioSystem::unregisterLatencyNotificationClient(int clientId) {
+-    Mutex::Autolock _l(gLatencyLock);
+-    gLatencyNotificationClients.removeItem(clientId);
+-}
+-#endif
+ 
+ // ---------------------------------------------------------------------------
+ 
+ void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who) {
+-#ifdef STE_AUDIO
+-    gLatencyLock.lock();
+-    AudioSystem::gLatencyNotificationClients.clear();
+-    gLatencyLock.unlock();
+-#endif
+-
+     Mutex::Autolock _l(AudioSystem::gLock);
+ 
+     AudioSystem::gAudioFlinger.clear();
+@@ -520,22 +488,6 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(int event, audio_io_handle
+         outputDesc =  new OutputDescriptor(*desc);
+         gOutputs.replaceValueFor(ioHandle, outputDesc);
+     } break;
+-#ifdef STE_AUDIO
+-    case SINK_LATENCY_CHANGED: {
+-        int sinkLatency = *((int*)param2);
+-        gLock.unlock();
+-        gLatencyLock.lock();
+-        size_t size = gLatencyNotificationClients.size();
+-        for (size_t i = 0; i < size; i++) {
+-            sp<NotificationClient> client = gLatencyNotificationClients.valueAt(i);
+-            if (client->mOutput == ioHandle) {
+-                (*client->mCb)(client->mCookie, ioHandle, sinkLatency);
+-            }
+-        }
+-        gLatencyLock.unlock();
+-        gLock.lock();
+-    } break;
+-#endif
+     case INPUT_OPENED:
+     case INPUT_CLOSED:
+     case INPUT_CONFIG_CHANGED:
+@@ -691,20 +643,11 @@ audio_io_handle_t AudioSystem::getInput(audio_source_t inputSource,
+                                     audio_format_t format,
+                                     uint32_t channels,
+                                     audio_in_acoustics_t acoustics,
+-#ifdef STE_AUDIO
+-                                    int sessionId,
+-                                    audio_input_clients *inputClientId)
+-#else
+                                     int sessionId)
+-#endif
+ {
+     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+     if (aps == 0) return 0;
+-#ifdef STE_AUDIO
+-    return aps->getInput(inputSource, samplingRate, format, channels, acoustics, sessionId, inputClientId);
+-#else
+     return aps->getInput(inputSource, samplingRate, format, channels, acoustics, sessionId);
+-#endif
+ }
+ 
+ status_t AudioSystem::startInput(audio_io_handle_t input)
+@@ -905,6 +848,11 @@ extern "C" bool _ZN7android11AudioSystem15isLowVisibilityENS0_11stream_typeE(aud
+     }
+ }
+ 
++extern "C" bool _ZN7android11AudioSystem10stopOutputEiNS0_11stream_typeEi(audio_io_handle_t output, audio_stream_type_t stream, int session)
++{
++    return AudioSystem::stopOutput(output, stream, session);
++}
++
+ #endif // AUDIO_LEGACY
+ 
+ }; // namespace android
+diff --git a/media/libmedia/AudioTrack.cpp b/media/libmedia/AudioTrack.cpp
+index afda4d4..34dde71 100644
+--- a/media/libmedia/AudioTrack.cpp
++++ b/media/libmedia/AudioTrack.cpp
+@@ -210,10 +210,6 @@ AudioTrack::~AudioTrack()
+     ALOGV_IF(mSharedBuffer != 0, "Destructor sharedBuffer: %p", mSharedBuffer->pointer());
+ 
+     if (mStatus == NO_ERROR) {
+-#ifdef STE_AUDIO
+-        AudioSystem::unregisterLatencyNotificationClient(mLatencyClientId);
+-#endif
+-
+         // Make sure that callback function exits in the case where
+         // it is looping on buffer full condition in obtainBuffer().
+         // Otherwise the callback thread will never exit.
+@@ -412,14 +408,10 @@ status_t AudioTrack::set(
+     mFormat = format;
+     mChannelMask = (uint32_t)channelMask;
+     mChannelCount = channelCount;
+-#ifdef STE_AUDIO
+-    mSharedBuffer = sharedBuffer;
+-#endif
++
+     mMuted = false;
+     mActive = false;
+-#ifdef STE_AUDIO
+-    mUserData = user;
+-#endif
++
+     mLoopCount = 0;
+     mMarkerPosition = 0;
+     mMarkerReached = false;
+@@ -1138,11 +1130,6 @@ status_t AudioTrack::createTrack_l(
+     if (mCblk->frameCount > mFrameCount) {
+         mFrameCount = mCblk->frameCount;
+     }
+-#ifdef STE_AUDIO
+-    if (mLatencyClientId != -1) {
+-        AudioSystem::unregisterLatencyNotificationClient(mLatencyClientId);
+-    }
+-#endif
+     return NO_ERROR;
+ }
+ 
+@@ -1682,15 +1669,6 @@ status_t AudioTrack::getTimeStamp(uint64_t *tstamp) {
+ }
+ #endif
+ 
+-#ifdef STE_AUDIO
+-// static
+-void AudioTrack::LatencyCallback(void *cookie, audio_io_handle_t output, uint32_t sinkLatency)
+-{
+-    AudioTrack *me = static_cast<AudioTrack *>(cookie);
+-    me->mLatency = sinkLatency + (1000*me->mCblk->frameCount) / me->mCblk->sampleRate;
+-}
+-#endif
+-
+ // =========================================================================
+ 
+ AudioTrack::AudioTrackThread::AudioTrackThread(AudioTrack& receiver, bool bCanCallJava)
+diff --git a/media/libmedia/IAudioFlinger.cpp b/media/libmedia/IAudioFlinger.cpp
+index ba74b29..344fa2a 100644
+--- a/media/libmedia/IAudioFlinger.cpp
++++ b/media/libmedia/IAudioFlinger.cpp
+@@ -57,10 +57,6 @@ enum {
+     CLOSE_OUTPUT,
+     SUSPEND_OUTPUT,
+     RESTORE_OUTPUT,
+-#ifdef STE_AUDIO
+-    ADD_INPUT_CLIENT,
+-    REMOVE_INPUT_CLIENT,
+-#endif
+     OPEN_INPUT,
+     CLOSE_INPUT,
+     SET_STREAM_OUTPUT,
+@@ -82,9 +78,6 @@ enum {
+ #ifdef QCOM_HARDWARE
+     CREATE_DIRECT_TRACK
+ #endif
+-#ifdef STE_AUDIO
+-    READ_INPUT
+-#endif
+ };
+ 
+ class BpAudioFlinger : public BpInterface<IAudioFlinger>
+@@ -492,36 +485,11 @@ public:
+         return reply.readInt32();
+     }
+ 
+-#ifdef STE_AUDIO
+-    virtual uint32_t *addInputClient(uint32_t clientId)
+-    {
+-        Parcel data, reply;
+-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+-        data.writeInt32(clientId);
+-        remote()->transact(ADD_INPUT_CLIENT, data, &reply);
+-        return (uint32_t*) reply.readIntPtr();
+-    }
+-
+-    virtual status_t removeInputClient(uint32_t *pClientId)
+-    {
+-        Parcel data, reply;
+-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+-        data.writeIntPtr((intptr_t)pClientId);
+-        remote()->transact(REMOVE_INPUT_CLIENT, data, &reply);
+-        return reply.readInt32();
+-    }
+-#endif
+-
+     virtual audio_io_handle_t openInput(audio_module_handle_t module,
+                                         audio_devices_t *pDevices,
+                                         uint32_t *pSamplingRate,
+                                         audio_format_t *pFormat,
+-#ifdef STE_AUDIO
+-                                        audio_channel_mask_t *pChannelMask,
+-                                        audio_input_clients *pInputClientId)
+-#else
+                                         audio_channel_mask_t *pChannelMask)
+-#endif
+     {
+         Parcel data, reply;
+         audio_devices_t devices = pDevices ? *pDevices : (audio_devices_t)0;
+@@ -535,9 +503,6 @@ public:
+         data.writeInt32(samplingRate);
+         data.writeInt32(format);
+         data.writeInt32(channelMask);
+-#ifdef STE_AUDIO
+-        data.writeIntPtr((intptr_t)pInputClientId);
+-#endif
+         remote()->transact(OPEN_INPUT, data, &reply);
+         audio_io_handle_t input = (audio_io_handle_t) reply.readInt32();
+         devices = (audio_devices_t)reply.readInt32();
+@@ -551,18 +516,11 @@ public:
+         return input;
+     }
+ 
+-#ifdef STE_AUDIO
+-    virtual status_t closeInput(int input, audio_input_clients *inputClientId)
+-#else
+     virtual status_t closeInput(int input)
+-#endif
+     {
+         Parcel data, reply;
+         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+         data.writeInt32(input);
+-#ifdef STE_AUDIO
+-        data.writeIntPtr((intptr_t) inputClientId);
+-#endif
+         remote()->transact(CLOSE_INPUT, data, &reply);
+         return reply.readInt32();
+     }
+@@ -616,22 +574,6 @@ public:
+         return reply.readInt32();
+     }
+ 
+-#ifdef STE_AUDIO
+-    virtual size_t readInput(audio_io_handle_t input, audio_input_clients inputClientId,
+-            void *buffer, uint32_t bytes, uint32_t *pOverwrittenBytes)
+-    {
+-        Parcel data, reply;
+-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
+-        data.writeInt32(input);
+-        data.writeInt32((uint32_t) inputClientId);
+-        data.writeIntPtr((intptr_t) buffer);
+-        data.writeInt32(bytes);
+-        data.writeIntPtr((intptr_t) pOverwrittenBytes);
+-        remote()->transact(READ_INPUT, data, &reply);
+-        return reply.readInt32();
+-    }
+-#endif
+-
+     virtual int newAudioSessionId()
+     {
+         Parcel data, reply;
+@@ -1036,20 +978,6 @@ status_t BnAudioFlinger::onTransact(
+             reply->writeInt32(restoreOutput((audio_io_handle_t) data.readInt32()));
+             return NO_ERROR;
+         } break;
+-#ifdef STE_AUDIO
+-        case ADD_INPUT_CLIENT: {
+-            CHECK_INTERFACE(IAudioFlinger, data, reply);
+-            uint32_t clientId = data.readInt32();
+-            reply->writeIntPtr((intptr_t)addInputClient(clientId));
+-            return NO_ERROR;
+-        } break;
+-        case REMOVE_INPUT_CLIENT: {
+-            CHECK_INTERFACE(IAudioFlinger, data, reply);
+-            uint32_t *pClientId = (uint32_t*) data.readIntPtr();
+-            reply->writeInt32(removeInputClient(pClientId));
+-            return NO_ERROR;
+-        } break;
+-#endif
+         case OPEN_INPUT: {
+             CHECK_INTERFACE(IAudioFlinger, data, reply);
+             audio_module_handle_t module = (audio_module_handle_t)data.readInt32();
+@@ -1057,20 +985,12 @@ status_t BnAudioFlinger::onTransact(
+             uint32_t samplingRate = data.readInt32();
+             audio_format_t format = (audio_format_t) data.readInt32();
+             audio_channel_mask_t channelMask = (audio_channel_mask_t)data.readInt32();
+-#ifdef STE_AUDIO
+-            audio_input_clients *inputClientId = (audio_input_clients*) data.readIntPtr();
+-#endif
+ 
+             audio_io_handle_t input = openInput(module,
+                                              &devices,
+                                              &samplingRate,
+                                              &format,
+-#ifdef STE_AUDIO
+-                                             &channelMask,
+-                                             inputClientId);
+-#else
+                                              &channelMask);
+-#endif
+             reply->writeInt32((int32_t) input);
+             reply->writeInt32(devices);
+             reply->writeInt32(samplingRate);
+@@ -1080,13 +1000,7 @@ status_t BnAudioFlinger::onTransact(
+         } break;
+         case CLOSE_INPUT: {
+             CHECK_INTERFACE(IAudioFlinger, data, reply);
+-#ifdef STE_AUDIO
+-            uint32_t input = data.readInt32();
+-            audio_input_clients *inputClientId = (audio_input_clients*) data.readIntPtr();
+-            reply->writeInt32(closeInput((audio_io_handle_t) data.readInt32(), inputClientId));
+-#else
+             reply->writeInt32(closeInput((audio_io_handle_t) data.readInt32()));
+-#endif
+             return NO_ERROR;
+         } break;
+         case SET_STREAM_OUTPUT: {
+@@ -1212,18 +1126,6 @@ status_t BnAudioFlinger::onTransact(
+             reply->writeInt32(loadHwModule(data.readCString()));
+             return NO_ERROR;
+         } break;
+-#ifdef STE_AUDIO
+-        case READ_INPUT: {
+-            CHECK_INTERFACE(IAudioFlinger, data, reply);
+-            audio_io_handle_t input = data.readInt32();
+-            audio_input_clients inputClientId = (audio_input_clients) data.readInt32();
+-            void* buffer = (void*) data.readIntPtr();
+-            uint32_t bytes = data.readInt32();
+-            uint32_t *pOverwrittenBytes = (uint32_t*) data.readIntPtr();
+-            reply->writeInt32(readInput(input, inputClientId, buffer, bytes, pOverwrittenBytes));
+-            return NO_ERROR;
+-        } break;
+-#endif
+         default:
+             return BBinder::onTransact(code, data, reply, flags);
+     }
+diff --git a/media/libmedia/IAudioPolicyService.cpp b/media/libmedia/IAudioPolicyService.cpp
+index f814fa8..7aab8d6 100644
+--- a/media/libmedia/IAudioPolicyService.cpp
++++ b/media/libmedia/IAudioPolicyService.cpp
+@@ -177,12 +177,7 @@ public:
+                                     audio_format_t format,
+                                     uint32_t channels,
+                                     audio_in_acoustics_t acoustics,
+-#ifdef STE_AUDIO
+-                                    int audioSession,
+-                                    audio_input_clients *inputClientId)
+-#else
+                                     int audioSession)
+-#endif
+     {
+         Parcel data, reply;
+         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+@@ -191,9 +186,6 @@ public:
+         data.writeInt32(static_cast <uint32_t>(format));
+         data.writeInt32(channels);
+         data.writeInt32(static_cast <uint32_t>(acoustics));
+-#ifdef STE_AUDIO
+-        data.writeIntPtr((intptr_t)inputClientId);
+-#endif
+         data.writeInt32(audioSession);
+         remote()->transact(GET_INPUT, data, &reply);
+         return static_cast <audio_io_handle_t> (reply.readInt32());
+@@ -475,23 +467,13 @@ status_t BnAudioPolicyService::onTransact(
+             uint32_t channels = data.readInt32();
+             audio_in_acoustics_t acoustics =
+                     static_cast <audio_in_acoustics_t>(data.readInt32());
+-#ifdef STE_AUDIO
+-            audio_input_clients *inputClientId =
+-                    (audio_input_clients*) data.readIntPtr();
+-#endif
+             int audioSession = data.readInt32();
+             audio_io_handle_t input = getInput(inputSource,
+                                                samplingRate,
+                                                format,
+                                                channels,
+                                                acoustics,
+-#ifdef STE_AUDIO
+-                                               audioSession,
+-                                               inputClientId);
+-#else
+                                                audioSession);
+-#endif
+-
+             reply->writeInt32(static_cast <int>(input));
+             return NO_ERROR;
+         } break;
+diff --git a/media/libmediaplayerservice/StagefrightRecorder.cpp b/media/libmediaplayerservice/StagefrightRecorder.cpp
+index fda4092..a3f97c6 100644
+--- a/media/libmediaplayerservice/StagefrightRecorder.cpp
++++ b/media/libmediaplayerservice/StagefrightRecorder.cpp
+@@ -1423,6 +1423,9 @@ status_t StagefrightRecorder::setupSurfaceMediaSource() {
+ 
+ status_t StagefrightRecorder::setupCameraSource(
+         sp<CameraSource> *cameraSource) {
++#ifdef QCOM_HARDWARE
++    bool useMeta = true;
++#endif
+     status_t err = OK;
+     if ((err = checkVideoEncoderCapabilities()) != OK) {
+         return err;
+@@ -1481,6 +1484,9 @@ status_t StagefrightRecorder::setupCameraSource(
+     CHECK(mFrameRate != -1);
+ 
+     mIsMetaDataStoredInVideoBuffers =
++#ifdef QCOM_HARDWARE
++    !useMeta ? false :
++#endif
+         (*cameraSource)->isMetaDataStoredInVideoBuffers();
+ 
+     return OK;
+@@ -1604,7 +1610,8 @@ status_t StagefrightRecorder::setupVideoEncoder(
+         encoder_flags |= OMXCodec::kStoreMetaDataInVideoBuffers;
+ #ifdef QCOM_HARDWARE
+         if (property_get("ro.board.platform", value, "0")
+-            && (!strncmp(value, "msm7x27a", sizeof("msm7x27a") - 1))) {
++            && (!strncmp(value, "msm7627a", sizeof("msm7627a") - 1) ||
++                !strncmp(value, "msm7x27a", sizeof("msm7x27a") - 1))) {
+             ALOGW("msm7627 family of chipsets supports, only one buffer at a time");
+             encoder_flags |= OMXCodec::kOnlySubmitOneInputBufferAtOneTime;
+         }
+diff --git a/media/libstagefright/ACodec.cpp b/media/libstagefright/ACodec.cpp
+index da4992c..e4d6179 100644
+--- a/media/libstagefright/ACodec.cpp
++++ b/media/libstagefright/ACodec.cpp
+@@ -37,6 +37,26 @@
+ #include "sec_format.h"
+ #endif
+ 
++#ifdef QCOM_HARDWARE
++#include <OMX_QCOMExtns.h>
++#include <gralloc_priv.h>
++#include <cutils/properties.h>
++#include <qcom_ui.h>
++
++//Smmoth streaming settings
++//Max resolution 1080p
++#define MAX_WIDTH 1920;
++#define MAX_HEIGHT 1080;
++
++//Min resolution QVGA
++#define MIN_WIDTH 480;
++#define MIN_HEIGHT 320;
++#endif
++
++#ifdef SAMSUNG_CODEC_SUPPORT
++#include "include/ColorFormat.h"
++#endif
++
+ namespace android {
+ 
+ template<class T>
+@@ -119,6 +139,38 @@ private:
+     DISALLOW_EVIL_CONSTRUCTORS(CodecObserver);
+ };
+ 
++#ifdef QCOM_HARDWARE
++static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
++static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
++
++class ColorFormatInfo {
++    private:
++          static const int32_t preferredFormat;
++    public:
++          static int32_t getPreferredFormat() {
++          return preferredFormat;
++          }
++};
++
++const int32_t ColorFormatInfo::preferredFormat =
++#ifdef TARGET7x30
++    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka;
++#endif
++#ifdef TARGET8x60
++    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka;
++#endif
++#ifdef TARGET7x27
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar;
++#endif
++#ifdef TARGET7x27A
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar;
++#endif
++#ifdef TARGET8x50
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar;
++#endif
++#endif //QCOM_HARDWARE
++
++
+ ////////////////////////////////////////////////////////////////////////////////
+ 
+ struct ACodec::BaseState : public AState {
+@@ -544,12 +596,8 @@ status_t ACodec::allocateOutputBuffersFromNativeWindow() {
+             mNativeWindow.get(),
+             def.format.video.nFrameWidth,
+             def.format.video.nFrameHeight,
+-#ifdef STE_HARDWARE
+-            OMXCodec::OmxToHALFormat(def.format.video.eColorFormat));
+-#else
+             def.format.video.eColorFormat);
+ #endif
+-#endif
+ 
+     if (err != 0) {
+         ALOGE("native_window_set_buffers_geometry failed: %s (%d)",
+@@ -1427,9 +1475,6 @@ status_t ACodec::setSupportedOutputFormat() {
+            || format.eColorFormat == OMX_QCOM_COLOR_FormatYVU420PackedSemiPlanar32m4ka
+            || format.eColorFormat == OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+ #endif
+-#ifdef STE_HARDWARE
+-           || format.eColorFormat == OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB
+-#endif
+          );
+ 
+     return mOMX->setParameter(
+diff --git a/media/libstagefright/Android.mk b/media/libstagefright/Android.mk
+index 4741118..7dae768 100644
+--- a/media/libstagefright/Android.mk
++++ b/media/libstagefright/Android.mk
+@@ -7,6 +7,34 @@ ifeq ($(BOARD_USES_ALSA_AUDIO),true)
+     endif
+ endif
+ 
++ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
++ifeq ($(TARGET_BOARD_PLATFORM),msm7x27a)
++    LOCAL_CFLAGS += -DUSE_AAC_HW_DEC
++endif
++
++ifeq ($(TARGET_BOARD_PLATFORM),msm7x27)
++    LOCAL_CFLAGS += -DTARGET7x27
++endif
++ifeq ($(TARGET_BOARD_PLATFORM),msm7x27a)
++    LOCAL_CFLAGS += -DTARGET7x27A
++endif
++ifeq ($(TARGET_BOARD_PLATFORM),msm7x30)
++    LOCAL_CFLAGS += -DTARGET7x30
++endif
++ifeq ($(TARGET_BOARD_PLATFORM),qsd8k)
++    LOCAL_CFLAGS += -DTARGET8x50
++endif
++ifeq ($(TARGET_BOARD_PLATFORM),msm8660)
++    LOCAL_CFLAGS += -DTARGET8x60
++endif
++ifeq ($(TARGET_BOARD_PLATFORM),msm8960)
++    LOCAL_CFLAGS += -DTARGET8x60
++endif
++ifeq ($(BOARD_CAMERA_USE_MM_HEAP),true)
++    LOCAL_CFLAGS += -DCAMERA_MM_HEAP
++endif
++endif
++
+ include frameworks/av/media/libstagefright/codecs/common/Config.mk
+ 
+ ifeq ($(TARGET_SOC),exynos4210)
+@@ -68,12 +96,6 @@ LOCAL_SRC_FILES:=                         \
+         XINGSeeker.cpp                    \
+         avc_utils.cpp                     \
+ 
+-ifeq ($(BOARD_USES_STE_FMRADIO),true)
+-LOCAL_SRC_FILES+=                         \
+-        FMRadioSource.cpp                 \
+-        PCMExtractor.cpp
+-endif
+-
+ ifeq ($(BOARD_USES_QCOM_HARDWARE),true)
+ LOCAL_SRC_FILES+=                         \
+         ExtendedExtractor.cpp             \
+@@ -106,7 +128,8 @@ LOCAL_C_INCLUDES:= \
+         $(TOP)/external/openssl/include \
+         $(TOP)/hardware/qcom/display/libgralloc \
+         $(TOP)/hardware/qcom/media/mm-core/inc \
+-        $(TOP)/system/core/include
++        $(TOP)/system/core/include \
++        $(TOP)/hardware/qcom/display/libqdutils
+ 
+ LOCAL_SHARED_LIBRARIES := \
+         libbinder \
+@@ -122,6 +145,7 @@ LOCAL_SHARED_LIBRARIES := \
+         liblog \
+         libmedia \
+         libmedia_native \
++        libqdutils \
+         libsonivox \
+         libssl \
+         libstagefright_omx \
+diff --git a/media/libstagefright/AwesomePlayer.cpp b/media/libstagefright/AwesomePlayer.cpp
+index c455b55..437cce0 100644
+--- a/media/libstagefright/AwesomePlayer.cpp
++++ b/media/libstagefright/AwesomePlayer.cpp
+@@ -50,7 +50,6 @@ Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ #endif
+ #include <media/stagefright/DataSource.h>
+ #include <media/stagefright/FileSource.h>
+-#include <media/stagefright/FMRadioSource.h>
+ #include <media/stagefright/MediaBuffer.h>
+ #include <media/stagefright/MediaDefs.h>
+ #include <media/stagefright/MediaExtractor.h>
+@@ -65,7 +64,12 @@ Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ 
+ #include <cutils/properties.h>
+ 
++#ifdef QCOM_LEGACY_OMX
++// Disable rendering directly to NativeWindow
++#define USE_SURFACE_ALLOC 0
++#else
+ #define USE_SURFACE_ALLOC 1
++#endif
+ #define FRAME_DROP_FREQ 0
+ 
+ namespace android {
+@@ -2522,15 +2526,6 @@ status_t AwesomePlayer::finishSetDataSource_l() {
+                 return UNKNOWN_ERROR;
+             }
+         }
+-#ifdef STE_FM
+-    } else if (!strncasecmp("fmradio://rx", mUri.string(), 12)) {
+-        sniffedMIME = MEDIA_MIMETYPE_AUDIO_RAW;
+-        dataSource = new FMRadioSource();
+-        status_t err = dataSource->initCheck();
+-        if (err != OK) {
+-            return err;
+-        }
+-#endif
+     } else {
+         dataSource = DataSource::CreateFromURI(mUri.string(), &mUriHeaders);
+     }
+diff --git a/media/libstagefright/CameraSource.cpp b/media/libstagefright/CameraSource.cpp
+index 30ddee7..57e3a43 100755
+--- a/media/libstagefright/CameraSource.cpp
++++ b/media/libstagefright/CameraSource.cpp
+@@ -125,12 +125,6 @@ static int32_t getColorFormat(const char* colorFormat) {
+        return OMX_TI_COLOR_FormatYUV420PackedSemiPlanar;
+     }
+ 
+-#ifdef STE_HARDWARE
+-    if (!strcmp(colorFormat, CameraParameters::PIXEL_FORMAT_YUV420MB)) {
+-       return OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB;
+-    }
+-#endif
+-
+     ALOGE("Uknown color format (%s), please add it to "
+          "CameraSource::getColorFormat", colorFormat);
+ 
+@@ -559,22 +553,13 @@ status_t CameraSource::initWithCameraAccess(
+ 
+     // XXX: query camera for the stride and slice height
+     // when the capability becomes available.
+-#ifdef STE_HARDWARE
+-    int stride = newCameraParams.getInt(CameraParameters::KEY_RECORD_STRIDE);
+-    int sliceHeight = newCameraParams.getInt(CameraParameters::KEY_RECORD_SLICE_HEIGHT);
+-#endif
+     mMeta = new MetaData;
+     mMeta->setCString(kKeyMIMEType,  MEDIA_MIMETYPE_VIDEO_RAW);
+     mMeta->setInt32(kKeyColorFormat, mColorFormat);
+     mMeta->setInt32(kKeyWidth,       mVideoSize.width);
+     mMeta->setInt32(kKeyHeight,      mVideoSize.height);
+-#ifdef STE_HARDWARE
+-    mMeta->setInt32(kKeyStride,      stride != -1 ? stride : mVideoSize.width);
+-    mMeta->setInt32(kKeySliceHeight, sliceHeight != -1 ? sliceHeight : mVideoSize.height);
+-#else
+     mMeta->setInt32(kKeyStride,      mVideoSize.width);
+     mMeta->setInt32(kKeySliceHeight, mVideoSize.height);
+-#endif
+     mMeta->setInt32(kKeyFrameRate,   mVideoFrameRate);
+     return OK;
+ }
+diff --git a/media/libstagefright/MPEG4Writer.cpp b/media/libstagefright/MPEG4Writer.cpp
+index 9d29c54..55b93d0 100755
+--- a/media/libstagefright/MPEG4Writer.cpp
++++ b/media/libstagefright/MPEG4Writer.cpp
+@@ -1917,7 +1917,7 @@ status_t MPEG4Writer::Track::threadEntry() {
+             mGotAllCodecSpecificData = true;
+             continue;
+         }
+-#if defined(OMAP_ENHANCEMENT) && defined(TARGET_OMAP3)
++#ifdef OMAP_ENHANCEMENT
+         else if (mIsAvc && count < 3) {
+             size_t size = buffer->range_length();
+ 
+diff --git a/media/libstagefright/MediaDefs.cpp b/media/libstagefright/MediaDefs.cpp
+index bb8c779..9bb5613 100644
+--- a/media/libstagefright/MediaDefs.cpp
++++ b/media/libstagefright/MediaDefs.cpp
+@@ -25,14 +25,9 @@ const char *MEDIA_MIMETYPE_VIDEO_VPX = "video/x-vnd.on2.vp8";
+ const char *MEDIA_MIMETYPE_VIDEO_AVC = "video/avc";
+ const char *MEDIA_MIMETYPE_VIDEO_MPEG4 = "video/mp4v-es";
+ const char *MEDIA_MIMETYPE_VIDEO_H263 = "video/3gpp";
+-#ifdef STE_HARDWARE
+-const char *MEDIA_MIMETYPE_VIDEO_H263_SW = "video/3gpp-sw";
+-#endif
+ const char *MEDIA_MIMETYPE_VIDEO_MPEG2 = "video/mpeg2";
+ const char *MEDIA_MIMETYPE_VIDEO_RAW = "video/raw";
+-#ifdef STE_HARDWARE
+-const char *MEDIA_MIMETYPE_VIDEO_VC1 = "video/vc1";
+-#endif
++
+ const char *MEDIA_MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
+ const char *MEDIA_MIMETYPE_AUDIO_AMR_WB = "audio/amr-wb";
+ const char *MEDIA_MIMETYPE_AUDIO_MPEG = "audio/mpeg";
+diff --git a/media/libstagefright/MediaExtractor.cpp b/media/libstagefright/MediaExtractor.cpp
+index 3036ecd..9683425 100644
+--- a/media/libstagefright/MediaExtractor.cpp
++++ b/media/libstagefright/MediaExtractor.cpp
+@@ -24,7 +24,6 @@
+ #include "include/MPEG4Extractor.h"
+ #include "include/WAVExtractor.h"
+ #include "include/OggExtractor.h"
+-#include "include/PCMExtractor.h"
+ #include "include/MPEG2PSExtractor.h"
+ #include "include/MPEG2TSExtractor.h"
+ #include "include/DRMExtractor.h"
+@@ -119,10 +118,6 @@ sp<MediaExtractor> MediaExtractor::Create(
+         ret = new AACExtractor(source, meta);
+     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MPEG2PS)) {
+         ret = new MPEG2PSExtractor(source);
+-#ifdef STE_FM
+-    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
+-        ret = new PCMExtractor(source);
+-#endif
+     }
+ 
+     if (ret != NULL) {
+diff --git a/media/libstagefright/OMXCodec.cpp b/media/libstagefright/OMXCodec.cpp
+index 0264725..3b8581e 100644
+--- a/media/libstagefright/OMXCodec.cpp
++++ b/media/libstagefright/OMXCodec.cpp
+@@ -90,11 +90,66 @@ const static int64_t kBufferFilledEventTimeOutNs = 3000000000LL;
+ // component in question is buggy or not.
+ const static uint32_t kMaxColorFormatSupported = 1000;
+ 
++#ifdef QCOM_HARDWARE
++static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
++static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
++#endif
++
+ #define FACTORY_CREATE_ENCODER(name) \
+ static sp<MediaSource> Make##name(const sp<MediaSource> &source, const sp<MetaData> &meta) { \
+     return new name(source, meta); \
+ }
+ 
++#ifdef QCOM_HARDWARE
++class ColorFormatInfo {
++    private:
++        enum {
++            LOCAL = 0,
++            REMOTE = 1,
++            END = 2
++        };
++        static const int32_t preferredColorFormat[END];
++    public:
++        static int32_t getPreferredColorFormat(bool isLocal) {
++            char colorformat[10]="";
++            if(!property_get("sf.debug.colorformat", colorformat, NULL)){
++                if(isLocal) {
++                    return preferredColorFormat[LOCAL];
++                }
++                return preferredColorFormat[REMOTE];
++            } else {
++                if(!strcmp(colorformat, "yamato")) {
++                    return QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka;
++                }
++                return preferredColorFormat[LOCAL];
++            }
++        }
++};
++
++const int32_t ColorFormatInfo::preferredColorFormat[] = {
++#ifdef TARGET7x30
++    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
++    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
++#endif
++#ifdef TARGET8x60
++    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
++    QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
++#endif
++#ifdef TARGET7x27
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar
++    //QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
++#endif
++#ifdef TARGET7x27A
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar
++#endif
++#ifdef TARGET8x50
++    OMX_QCOM_COLOR_FormatYVU420SemiPlanar,
++    QOMX_COLOR_FormatYVU420PackedSemiPlanar32m4ka
++#endif
++};
++#endif
+ #define FACTORY_REF(name) { #name, Make##name },
+ 
+ FACTORY_CREATE_ENCODER(AACEncoder)
+@@ -268,20 +323,6 @@ void OMXCodec::findMatchingCodecs(
+     }
+ }
+ 
+-#ifdef STE_HARDWARE
+-uint32_t OMXCodec::OmxToHALFormat(OMX_COLOR_FORMATTYPE omxValue) {
+-    switch (omxValue) {
+-        case OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB:
+-            return HAL_PIXEL_FORMAT_YCBCR42XMBN;
+-        case OMX_COLOR_FormatYUV420Planar:
+-            return HAL_PIXEL_FORMAT_YCbCr_420_P;
+-        default:
+-            ALOGI("Unknown OMX pixel format (0x%X), passing it on unchanged", omxValue);
+-            return omxValue;
+-    }
+-}
+-#endif
+-
+ // static
+ uint32_t OMXCodec::getComponentQuirks(
+         const MediaCodecList *list, size_t index) {
+@@ -314,12 +355,6 @@ uint32_t OMXCodec::getComponentQuirks(
+                 index, "input-buffer-sizes-are-bogus")) {
+       quirks |= kInputBufferSizesAreBogus;
+     }
+-#ifdef STE_HARDWARE
+-    if (list->codecHasQuirk(
+-                index, "requires-store-metadata-before-idle")) {
+-      quirks |= kRequiresStoreMetaDataBeforeIdle;
+-    }
+-#endif
+ #ifdef QCOM_HARDWARE
+     if (list->codecHasQuirk(
+                 index, "requires-global-flush")) {
+@@ -329,6 +364,12 @@ uint32_t OMXCodec::getComponentQuirks(
+                 index, "requires-wma-pro-component")) {
+         quirks |= kRequiresWMAProComponent;
+     }
++#if defined(QCOM_LEGACY_OMX) || !defined(QCOM_HARDWARE)
++    if (list->codecHasQuirk(
++                index, "requires-larger-encoder-output-buffer")) {
++            quirks |= kRequiresLargerEncoderOutputBuffer;
++    }
++#endif
+ #endif
+     return quirks;
+ }
+@@ -767,6 +808,10 @@ status_t OMXCodec::configureCodec(const sp<MetaData> &meta) {
+             status_t err = mOMX->getExtensionIndex(
+                 mNode, OMX_QCOM_INDEX_PARAM_VIDEO_SYNCFRAMEDECODINGMODE, &indexType);
+ 
++#ifdef QCOM_LEGACY_OMX
++            // Don't run this check with the legacy encoder
++            if (strncmp(mComponentName, "OMX.qcom.video.encoder.", 23))
++#endif
+             CHECK_EQ(err, (status_t)OK);
+ 
+             enableType.bEnable = OMX_TRUE;
+@@ -1019,9 +1064,6 @@ static size_t getFrameSize(
+         case OMX_COLOR_FormatYUV420Planar:
+         case OMX_COLOR_FormatYUV420SemiPlanar:
+         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+-#ifdef STE_HARDWARE
+-        case OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB:
+-#endif
+         /*
+         * FIXME: For the Opaque color format, the frame size does not
+         * need to be (w*h*3)/2. It just needs to
+@@ -1037,6 +1079,12 @@ static size_t getFrameSize(
+ #endif
+             return (width * height * 3) / 2;
+ 
++#ifdef QCOM_LEGACY_OMX
++    case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
++        return (((width + 15) & -16) * ((height + 15) & -16) * 3) / 2;
++#endif
++
++
+ #ifdef EXYNOS4_ENHANCEMENTS
+         case OMX_SEC_COLOR_FormatNV12LVirtualAddress:
+             return ALIGN((ALIGN(width, 16) * ALIGN(height, 16)), 2048) + ALIGN((ALIGN(width, 16) * ALIGN(height >> 1, 8)), 2048);
+@@ -1116,6 +1164,7 @@ void OMXCodec::setVideoInputFormat(
+     success = success && meta->findInt32(kKeyBitRate, &bitRate);
+     success = success && meta->findInt32(kKeyStride, &stride);
+     success = success && meta->findInt32(kKeySliceHeight, &sliceHeight);
++    CODEC_LOGI("setVideoInputFormat width=%ld, height=%ld", width, height);
+     CHECK(success);
+     CHECK(stride != 0);
+ 
+@@ -1588,6 +1637,17 @@ status_t OMXCodec::setVideoOutputFormat(
+         OMX_VIDEO_PARAM_PORTFORMATTYPE format;
+         InitOMXParams(&format);
+         format.nPortIndex = kPortIndexOutput;
++#if defined(QCOM_HARDWARE) && !defined(QCOM_LEGACY_OMX)
++        if (!strncmp(mComponentName, "OMX.qcom",8)) {
++            int32_t reqdColorFormat = ColorFormatInfo::getPreferredColorFormat(mOMXLivesLocally);
++            for(format.nIndex = 0;
++                    (OK == mOMX->getParameter(mNode, OMX_IndexParamVideoPortFormat, &format, sizeof(format)));
++                    format.nIndex++) {
++                if(format.eColorFormat == reqdColorFormat)
++                    break;
++            }
++        } else
++#endif
+         format.nIndex = 0;
+ 
+         status_t err = mOMX->getParameter(
+@@ -1610,9 +1670,6 @@ status_t OMXCodec::setVideoOutputFormat(
+                || format.eColorFormat == OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka
+                || format.eColorFormat == OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar32m
+ #endif
+-#ifdef STE_HARDWARE
+-               || format.eColorFormat == OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB
+-#endif
+                );
+ 
+         if (!strncmp("OMX.SEC.", mComponentName, 8)) {
+@@ -1731,7 +1788,11 @@ OMXCodec::OMXCodec(
+       mPaused(false),
+       mNativeWindow(
+               (!strncmp(componentName, "OMX.google.", 11)
+-              || !strcmp(componentName, "OMX.Nvidia.mpeg2v.decode"))
++              || !strcmp(componentName, "OMX.Nvidia.mpeg2v.decode")
++#ifdef QCOM_LEGACY_OMX
++              || !strncmp(componentName, "OMX.qcom",8)
++#endif
++      )
+                         ? NULL : nativeWindow)
+ #ifdef QCOM_HARDWARE
+       ,mThumbnailMode(false),
+@@ -1791,10 +1852,6 @@ void OMXCodec::setComponentRole(
+             "video_decoder.mpeg4", "video_encoder.mpeg4" },
+         { MEDIA_MIMETYPE_VIDEO_H263,
+             "video_decoder.h263", "video_encoder.h263" },
+-#ifdef STE_HARDWARE
+-        { MEDIA_MIMETYPE_VIDEO_VC1,
+-            "video_decoder.vc1", "video_encoder.vc1" },
+-#endif
+         { MEDIA_MIMETYPE_VIDEO_VPX,
+             "video_decoder.vpx", "video_encoder.vpx" },
+         { MEDIA_MIMETYPE_AUDIO_RAW,
+@@ -1882,17 +1939,6 @@ status_t OMXCodec::init() {
+     CHECK_EQ((int)mState, (int)LOADED);
+ 
+     status_t err;
+-#ifdef STE_HARDWARE
+-    if ((mQuirks & kRequiresStoreMetaDataBeforeIdle)
+-        && (mFlags & kStoreMetaDataInVideoBuffers)) {
+-        err = mOMX->storeMetaDataInBuffers(mNode, kPortIndexInput, OMX_TRUE);
+-        if (err != OK) {
+-            ALOGE("Storing meta data in video buffers is not supported");
+-            return err;
+-        }
+-    }
+-#endif
+-
+     if (!(mQuirks & kRequiresLoadedToIdleAfterAllocation)) {
+         err = mOMX->sendCommand(mNode, OMX_CommandStateSet, OMX_StateIdle);
+         CHECK_EQ(err, (status_t)OK);
+@@ -1967,13 +2013,8 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
+     }
+ 
+     status_t err = OK;
+-#ifdef STE_HARDWARE
+-    if (!(mQuirks & kRequiresStoreMetaDataBeforeIdle)
+-            && (mFlags & kStoreMetaDataInVideoBuffers)
+-#else
++#ifndef QCOM_LEGACY_OMX
+     if ((mFlags & kStoreMetaDataInVideoBuffers)
+-#endif
+-
+             && portIndex == kPortIndexInput) {
+         ALOGW("Trying to enable metadata mode on encoder");
+         err = mOMX->storeMetaDataInBuffers(mNode, kPortIndexInput, OMX_TRUE);
+@@ -1982,6 +2023,7 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
+             return err;
+         }
+     }
++#endif
+ 
+     OMX_PARAM_PORTDEFINITIONTYPE def;
+     InitOMXParams(&def);
+@@ -1994,6 +2036,26 @@ status_t OMXCodec::allocateBuffersOnPort(OMX_U32 portIndex) {
+         return err;
+     }
+ 
++#if defined(QCOM_HARDWARE) && !defined(QCOM_LEGACY_OMX)
++    if (mFlags & kUseMinBufferCount) {
++        def.nBufferCountActual = def.nBufferCountMin;
++        if (!mIsEncoder) {
++                if (portIndex == kPortIndexOutput) {
++                    def.nBufferCountActual += 2;
++                }else {
++                    def.nBufferCountActual += 1;
++                }
++        }
++        err = mOMX->setParameter(
++                    mNode, OMX_IndexParamPortDefinition, &def, sizeof(def));
++        if (err != OK) {
++            CODEC_LOGE("setting nBufferCountActual to %lu failed: %d",
++                    def.nBufferCountActual, err);
++            return err;
++        }
++    }
++#endif
++
+     CODEC_LOGV("allocating %lu buffers of size %lu on %s port",
+             def.nBufferCountActual, def.nBufferSize,
+             portIndex == kPortIndexInput ? "input" : "output");
+@@ -2197,12 +2259,8 @@ status_t OMXCodec::allocateOutputBuffersFromNativeWindow() {
+ #ifdef QCOM_HARDWARE
+             format
+ #else
+-#ifdef STE_HARDWARE
+-	    OmxToHALFormat(def.format.video.eColorFormat)
+-#else
+             def.format.video.eColorFormat
+ #endif
+-#endif
+           );
+ #else
+ #include <sec_format.h>
+diff --git a/media/libstagefright/OggExtractor.cpp b/media/libstagefright/OggExtractor.cpp
+index 5e79e78..f07f27a 100644
+--- a/media/libstagefright/OggExtractor.cpp
++++ b/media/libstagefright/OggExtractor.cpp
+@@ -805,6 +805,9 @@ void parseVorbisComment(
+         { "ANDROID_LOOP", kKeyAutoLoop },
+     };
+ 
++    char repeatRingtone[PROPERTY_VALUE_MAX];
++    property_get("media.ringtone.force_repeat", repeatRingtone, "0");
++
+         for (size_t j = 0; j < sizeof(kMap) / sizeof(kMap[0]); ++j) {
+             size_t tagLen = strlen(kMap[j].mTag);
+             if (!strncasecmp(kMap[j].mTag, comment, tagLen)
+@@ -815,7 +818,8 @@ void parseVorbisComment(
+                             &comment[tagLen + 1],
+                             commentLength - tagLen - 1);
+                 } else if (kMap[j].mKey == kKeyAutoLoop) {
+-                    if (!strcasecmp(&comment[tagLen + 1], "true")) {
++                    if (!strcasecmp(&comment[tagLen + 1], "true") 
++                      || atoi(repeatRingtone)) {
+                         fileMeta->setInt32(kKeyAutoLoop, true);
+                     }
+                 } else {
+diff --git a/media/libstagefright/StagefrightMetadataRetriever.cpp b/media/libstagefright/StagefrightMetadataRetriever.cpp
+index 7350125..0af913a 100644
+--- a/media/libstagefright/StagefrightMetadataRetriever.cpp
++++ b/media/libstagefright/StagefrightMetadataRetriever.cpp
+@@ -429,7 +429,7 @@ VideoFrame *StagefrightMetadataRetriever::getFrameAtTime(
+             && (!strncmp(value, "msm8660", sizeof("msm8660") - 1) ||
+                 !strncmp(value, "msm8960", sizeof("msm8960") - 1) ||
+                 !strncmp(value, "msm7x27a", sizeof("msm7x27a") - 1) ||
+-                !strncmp(value, "msm7x30", sizeof("msm7x30") - 1) )) {
++                !strncmp(value, "msm7630", sizeof("msm7630") - 1) )) {
+             flags |= OMXCodec::kEnableThumbnailMode | OMXCodec::kHardwareCodecsOnly;
+         }
+ #endif
+@@ -477,7 +477,7 @@ const char *StagefrightMetadataRetriever::extractMetadata(int keyCode) {
+         return NULL;
+     }
+ 
+-    return mMetaData.valueAt(index).string();
++    return strdup(mMetaData.valueAt(index).string());
+ }
+ 
+ void StagefrightMetadataRetriever::parseMetaData() {
+diff --git a/media/libstagefright/SurfaceMediaSource.cpp b/media/libstagefright/SurfaceMediaSource.cpp
+index 03d4f31..e43bea7 100644
+--- a/media/libstagefright/SurfaceMediaSource.cpp
++++ b/media/libstagefright/SurfaceMediaSource.cpp
+@@ -66,11 +66,7 @@ SurfaceMediaSource::SurfaceMediaSource(uint32_t bufferWidth, uint32_t bufferHeig
+ #ifdef CAMERA_MM_HEAP
+             GRALLOC_USAGE_PRIVATE_MM_HEAP | GRALLOC_USAGE_PRIVATE_UNCACHED |
+ #endif
+-#ifdef STE_HARDWARE
+-            GRALLOC_USAGE_HW_2D);
+-#else
+             GRALLOC_USAGE_HW_TEXTURE);
+-#endif
+ 
+     sp<ISurfaceComposer> composer(ComposerService::getComposerService());
+ 
+diff --git a/media/libstagefright/colorconversion/ColorConverter.cpp b/media/libstagefright/colorconversion/ColorConverter.cpp
+index e26f7da..329e9ee 100644
+--- a/media/libstagefright/colorconversion/ColorConverter.cpp
++++ b/media/libstagefright/colorconversion/ColorConverter.cpp
+@@ -52,9 +52,6 @@ bool ColorConverter::isValid() const {
+ #ifdef QCOM_HARDWARE
+         case OMX_QCOM_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka:
+ #endif
+-#ifdef STE_HARDWARE
+-        case OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB:
+-#endif
+             return true;
+ 
+         default:
+@@ -181,11 +178,7 @@ status_t ColorConverter::convert(
+             }
+             break;
+ #endif
+-#ifdef STE_HARDWARE
+-        case OMX_STE_COLOR_FormatYUV420PackedSemiPlanarMB:
+-            err = convertSTEYUV420PackedSemiPlanarMB(src, dst);
+-            break;
+-#endif
++
+         default:
+         {
+             CHECK(!"Should not be here. Unknown color conversion.");
+@@ -570,145 +563,6 @@ status_t ColorConverter::convertTIYUV420PackedSemiPlanar(
+     return OK;
+ }
+ 
+-#ifdef STE_HARDWARE
+-status_t ColorConverter::convertSTEYUV420PackedSemiPlanarMB(
+-        const BitmapParams &src, const BitmapParams &dst) {
+-
+-    if (!((dst.mWidth & 1) == 0
+-            && src.mCropLeft == 0
+-            && src.mCropTop == 0
+-            && src.cropWidth() == dst.cropWidth()
+-            && src.cropHeight() == dst.cropHeight())) {
+-        return ERROR_UNSUPPORTED;
+-    }
+-
+-    OMX_U32 mx = src.mWidth / 16;
+-    OMX_U32 my = src.mHeight / 16;
+-    OMX_U32 lx, ly;
+-    OMX_U32 *pChroma, *pLuma = (OMX_U32 *)src.mBits;
+-
+-    pChroma = (OMX_U32 *)src.mBits + mx * my * 64;
+-    for (ly = 0; ly < my; ly++) {
+-        for (lx = 0; lx < mx; lx++) {
+-            OMX_U32 col, row, lumaWord, chromaWord1 = 0, rgbWord, i;
+-            OMX_U8 y[4], cb[4], cr[4], r[4], g[4], b[4];
+-            OMX_U32 *dstBuf, *locBuf;
+-            OMX_U32 *pBurstLuma = 0, *pBurstChroma = 0;
+-            OMX_U32 *pWordLuma = 0, *pWordChroma = 0;
+-            OMX_U8 nbOfBlock;
+-
+-            dstBuf = ((OMX_U32 *)dst.mBits) + (ly * 16) * dst.mWidth / 2;
+-            dstBuf += (lx * 16) / 2;
+-
+-            pBurstLuma = pLuma;
+-            pBurstChroma = pChroma;
+-
+-            for (col = 0; col < 2; col++) {
+-                // conversion of a macroblock
+-                for (nbOfBlock = 0; nbOfBlock < 2; nbOfBlock++) {
+-                    locBuf = dstBuf + 4 * col + 2 * nbOfBlock;
+-                    OMX_U32 dstRowOrigo = ly * 16 * dst.mWidth;
+-
+-                    switch (nbOfBlock) {
+-                    case 0:
+-                        pWordLuma = pBurstLuma;
+-                        pWordChroma = pBurstChroma;
+-                        break;
+-                    case 1:
+-                        pWordLuma = pBurstLuma + 1;
+-                        pWordChroma = pBurstChroma + 1;
+-                        break;
+-                    }
+-                    for (row = 0; row < 16; row++) {
+-
+-                        // Check for cropping on the y axis
+-                        if (ly * 16 + row >= dst.mHeight) {
+-                            break;
+-                        }
+-
+-                        lumaWord = *pWordLuma;
+-                        pWordLuma += 2;
+-                        if (row % 2 == 0) {
+-                            chromaWord1 = *pWordChroma;
+-                            pWordChroma += 2;
+-                        }
+-
+-                        y[3] = ((lumaWord >> 24) & 0xff);
+-                        y[2] = ((lumaWord >> 16) & 0xff);
+-                        y[1] = ((lumaWord >>  8) & 0xff);
+-                        y[0] = ((lumaWord >>  0) & 0xff);
+-
+-                        cb[0] = cb[1] = ((chromaWord1 >>  0) & 0xff);
+-                        cb[2] = cb[3] = ((chromaWord1 >> 16) & 0xff);
+-                        cr[0] = cr[1] = ((chromaWord1 >>  8) & 0xff);
+-                        cr[2] = cr[3] = ((chromaWord1 >> 24) & 0xff);
+-
+-                        for (i = 0; i < 4; i++) {
+-
+-                            int32_t rW,gW,bW;
+-
+-                            rW = 298 * y[i] + 408 * cr[i] - 57059;
+-                            gW = 298 * y[i] - 100 * cb[i] - 208 * cr[i] + 34713;
+-                            bW = 298 * y[i] + 516 * cb[i] - 70887;
+-
+-                            if (rW < 0) {
+-                                r[i] = 0;
+-                            } else if (rW >= 65536) {
+-                                r[i] = 255;
+-                            } else {
+-                                r[i] = (rW >> 8);
+-                            }
+-                            if (gW < 0) {
+-                                g[i] = 0;
+-                            } else if (gW >= 65536) {
+-                                g[i] = 255;
+-                            } else {
+-                                g[i] = (gW >> 8);
+-                            }
+-                            if (bW < 0) {
+-                                b[i] = 0;
+-                            } else if (bW >= 65536) {
+-                                b[i] = 255;
+-                            } else {
+-                                b[i] = (bW >> 8);
+-                            }
+-                            r[i] >>= 3;
+-                            g[i] >>= 2;
+-                            b[i] >>= 3;
+-                        }
+-                        for (i = 0; i < 4; i += 2) {
+-
+-                            // Check for cropping on the x axis
+-                            OMX_U32 rowPos = (locBuf - (OMX_U32 *)dst.mBits) * 2 - dstRowOrigo;
+-                            if (rowPos >= dst.mWidth) {
+-                                locBuf++;
+-                                continue;
+-                            }
+-
+-                            rgbWord = (r[i + 1] << 27) +
+-                                (g[i + 1] << 21) +
+-                                (b[i + 1] << 16) +
+-                                (r[i] << 11) +
+-                                (g[i] << 5) +
+-                                (b[i] << 0);
+-                            *locBuf++ = rgbWord;
+-                        }
+-                        locBuf += dst.mWidth / 2 - 2;
+-                        dstRowOrigo += dst.mWidth;
+-                    } //end of for 16 loop
+-                }  //end of 2 block loop
+-                pBurstLuma += 32;
+-                pBurstChroma += 16;
+-            } // end of 2 col loop
+-            pLuma   += 64;
+-            pChroma += 32;
+-        }
+-    }
+-
+-    return OK;
+-}
+-#endif
+-
+ uint8_t *ColorConverter::initClip() {
+     static const signed kClipMin = -278;
+     static const signed kClipMax = 535;
+diff --git a/media/libstagefright/colorconversion/SoftwareRenderer.cpp b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+index 9bfa364..3d3e64f 100644
+--- a/media/libstagefright/colorconversion/SoftwareRenderer.cpp
++++ b/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+@@ -28,6 +28,11 @@
+ 
+ namespace android {
+ 
++#ifdef QCOM_HARDWARE
++static const int QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka = 0x7FA30C03;
++static const int OMX_QCOM_COLOR_FormatYVU420SemiPlanar = 0x7FA30C00;
++#endif
++
+ static bool runningInEmulator() {
+     char prop[PROPERTY_VALUE_MAX];
+     return (property_get("ro.kernel.qemu", prop, NULL) > 0);
+@@ -65,6 +70,7 @@ SoftwareRenderer::SoftwareRenderer(
+     size_t bufWidth, bufHeight;
+ 
+     switch (mColorFormat) {
++#ifndef MISSING_EGL_PIXEL_FORMAT_YV12
+         case OMX_COLOR_FormatYUV420Planar:
+         case OMX_TI_COLOR_FormatYUV420PackedSemiPlanar:
+         {
+@@ -76,7 +82,19 @@ SoftwareRenderer::SoftwareRenderer(
+             }
+ 
+             // fall through.
++
++        }
++#endif
++#ifdef QCOM_LEGACY_OMX
++        case OMX_QCOM_COLOR_FormatYVU420SemiPlanar:
++        {
++            halFormat = HAL_PIXEL_FORMAT_YCrCb_420_SP;
++            bufWidth = (mCropWidth + 1) & ~1;
++            bufHeight = (mCropHeight + 1) & ~1;
++            mAlign = ((mWidth + 15) & -16) * ((mHeight + 15) & -16);
++            break;
+         }
++#endif
+ 
+         default:
+             halFormat = HAL_PIXEL_FORMAT_RGB_565;
+@@ -89,6 +107,10 @@ SoftwareRenderer::SoftwareRenderer(
+             break;
+     }
+ 
++    ALOGI("Buffer color format: 0x%X", mColorFormat);
++    ALOGI("Video params: mWidth: %d, mHeight: %d, mCropWidth: %d, mCropHeight: %d, mCropTop: %d, mCropLeft: %d",
++         mWidth, mHeight, mCropWidth, mCropHeight, mCropTop, mCropLeft);
++
+     CHECK(mNativeWindow != NULL);
+     CHECK(mCropWidth > 0);
+     CHECK(mCropHeight > 0);
+@@ -201,6 +223,31 @@ void SoftwareRenderer::render(
+             dst_u += dst_c_stride;
+             dst_v += dst_c_stride;
+         }
++#ifdef QCOM_LEGACY_OMX
++    } else if (mColorFormat == OMX_QCOM_COLOR_FormatYVU420SemiPlanar) {
++        // Legacy Qualcomm color format
++
++        uint8_t *src_y = (uint8_t *)data;
++        uint8_t *src_u = src_y + mAlign;
++        uint8_t *dst_y = (uint8_t *)dst;
++        uint8_t *dst_u = dst_y + buf->stride * buf->height;
++
++        // Legacy codec doesn't return crop params. Ignore it for speedup :)
++        memcpy(dst_y, src_y, mCropWidth * mCropHeight);
++        memcpy(dst_u, src_u, mCropWidth * mCropHeight / 2);
++
++        /*for(size_t y = 0; y < mCropHeight; ++y) {
++            memcpy(dst_y, src_y, mCropWidth);
++            dst_y += buf->stride;
++            src_y += mWidth;
++
++            if(y & 1) {
++                memcpy(dst_u, src_u, mCropWidth);
++                dst_u += buf->stride;
++                src_u += mWidth;
++            }
++        }*/
++#endif
+     } else {
+         CHECK_EQ(mColorFormat, OMX_TI_COLOR_FormatYUV420PackedSemiPlanar);
+ 
+diff --git a/media/libstagefright/include/SoftwareRenderer.h b/media/libstagefright/include/SoftwareRenderer.h
+index 7ab0042..27bcf6c 100644
+--- a/media/libstagefright/include/SoftwareRenderer.h
++++ b/media/libstagefright/include/SoftwareRenderer.h
+@@ -48,6 +48,9 @@ private:
+     int32_t mWidth, mHeight;
+     int32_t mCropLeft, mCropTop, mCropRight, mCropBottom;
+     int32_t mCropWidth, mCropHeight;
++#ifdef QCOM_LEGACY_OMX
++    int32_t mAlign;
++#endif
+ 
+     SoftwareRenderer(const SoftwareRenderer &);
+     SoftwareRenderer &operator=(const SoftwareRenderer &);
+diff --git a/media/libstagefright/omx/Android.mk b/media/libstagefright/omx/Android.mk
+index 5d6467d..d7fbbbe 100644
+--- a/media/libstagefright/omx/Android.mk
++++ b/media/libstagefright/omx/Android.mk
+@@ -23,10 +23,6 @@ LOCAL_SHARED_LIBRARIES :=               \
+         libstagefright_foundation       \
+         libdl
+ 
+-ifeq ($(BOARD_USES_PROPRIETARY_OMX),SAMSUNG)
+-LOCAL_CFLAGS     += -DSAMSUNG_OMX
+-endif
+-
+ LOCAL_MODULE:= libstagefright_omx
+ 
+ include $(BUILD_SHARED_LIBRARY)
+diff --git a/media/libstagefright/omx/OMXMaster.cpp b/media/libstagefright/omx/OMXMaster.cpp
+index c544770..6b6d0ab 100644
+--- a/media/libstagefright/omx/OMXMaster.cpp
++++ b/media/libstagefright/omx/OMXMaster.cpp
+@@ -45,9 +45,6 @@ OMXMaster::~OMXMaster() {
+ 
+ void OMXMaster::addVendorPlugin() {
+     addPlugin("libstagefrighthw.so");
+-#ifdef SAMSUNG_OMX
+-    addPlugin("libsomxcore.so");
+-#endif
+ }
+ 
+ void OMXMaster::addPlugin(const char *libname) {
+diff --git a/media/libstagefright/omx/SoftOMXPlugin.cpp b/media/libstagefright/omx/SoftOMXPlugin.cpp
+index 229e0fb..3747b3b 100644
+--- a/media/libstagefright/omx/SoftOMXPlugin.cpp
++++ b/media/libstagefright/omx/SoftOMXPlugin.cpp
+@@ -34,9 +34,6 @@ static const struct {
+     const char *mRole;
+ 
+ } kComponents[] = {
+-#ifdef STE_HARDWARE
+-    { "OMX.ST.aac.decoder", "ste_aacdec", "audio_decoder.aac" },
+-#endif
+     { "OMX.google.aac.decoder", "aacdec", "audio_decoder.aac" },
+     { "OMX.google.aac.encoder", "aacenc", "audio_encoder.aac" },
+     { "OMX.google.amrnb.decoder", "amrdec", "audio_decoder.amrnb" },
+@@ -51,9 +48,6 @@ static const struct {
+     { "OMX.google.h263.encoder", "mpeg4enc", "video_encoder.h263" },
+     { "OMX.google.mpeg4.decoder", "mpeg4dec", "video_decoder.mpeg4" },
+     { "OMX.google.mpeg4.encoder", "mpeg4enc", "video_encoder.mpeg4" },
+-#ifdef STE_HARDWARE
+-    { "OMX.ST.mp3.decoder", "ste_mp3dec", "audio_decoder.mp3" },
+-#endif
+     { "OMX.google.mp3.decoder", "mp3dec", "audio_decoder.mp3" },
+     { "OMX.google.vorbis.decoder", "vorbisdec", "audio_decoder.vorbis" },
+     { "OMX.google.vpx.decoder", "vpxdec", "video_decoder.vpx" },
+diff --git a/services/audioflinger/AudioFlinger.cpp b/services/audioflinger/AudioFlinger.cpp
+index 77b59e8..19994ee 100644
+--- a/services/audioflinger/AudioFlinger.cpp
++++ b/services/audioflinger/AudioFlinger.cpp
+@@ -1320,20 +1320,6 @@ unsigned int AudioFlinger::getInputFramesLost(audio_io_handle_t ioHandle) const
+     return 0;
+ }
+ 
+-#ifdef STE_AUDIO
+-size_t AudioFlinger::readInput(audio_io_handle_t input, audio_input_clients inputClientId,
+-        void *buffer, uint32_t bytes, uint32_t *pOverwrittenBytes)
+-{
+-    if (input == 0 || buffer == NULL) {
+-        return 0;
+-    }
+-
+-    AudioStreamIn* InStream = (AudioStreamIn*)input;
+-
+-    return 0;
+-}
+-#endif
+-
+ status_t AudioFlinger::setVoiceVolume(float value)
+ {
+     status_t ret = initCheck();
+@@ -2406,9 +2392,6 @@ void AudioFlinger::PlaybackThread::audioConfigChanged_l(int event, int param) {
+         break;
+ 
+     case AudioSystem::STREAM_CONFIG_CHANGED:
+-#ifdef STE_AUDIO
+-    case AudioSystem::SINK_LATENCY_CHANGED:
+-#endif
+         param2 = &param;
+     case AudioSystem::OUTPUT_CLOSED:
+     default:
+@@ -3953,11 +3936,6 @@ bool AudioFlinger::MixerThread::checkForNewParameters_l()
+                 mEffectChains[i]->setDevice_l(mDevice);
+             }
+         }
+-#ifdef STE_AUDIO
+-        if (param.getInt(String8(AudioParameter::keySinkLatency), value) == NO_ERROR) {
+-            sendConfigEvent_l(AudioSystem::SINK_LATENCY_CHANGED, value);
+-        }
+-#endif
+ 
+         if (status == NO_ERROR) {
+             status = mOutput->stream->common.set_parameters(&mOutput->stream->common,
+@@ -6368,19 +6346,20 @@ AudioFlinger::DirectAudioTrack::~DirectAudioTrack() {
+     LOGD("SRS_Processing - DirectAudioTrack - OutNotify_Init: %p TID %d\n", this, gettid());
+     SRS_Processing::ProcessOutNotify(SRS_Processing::AUTO, this, false);
+ #endif
++
+     if (mFlag & AUDIO_OUTPUT_FLAG_LPA) {
+         requestAndWaitForEffectsThreadExit();
+         mAudioFlinger->deregisterClient(mAudioFlingerClient);
+         mAudioFlinger->deleteEffectSession();
+         deallocateBufPool();
+     }
+-    AudioSystem::releaseOutput(mOutput);
+     releaseWakeLock();
+ 
+     if (mPowerManager != 0) {
+         sp<IBinder> binder = mPowerManager->asBinder();
+         binder->unlinkToDeath(mDeathRecipient);
+     }
++    AudioSystem::releaseOutput(mOutput);
+ }
+ 
+ status_t AudioFlinger::DirectAudioTrack::start() {
+@@ -6894,12 +6873,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
+                                          uint32_t sampleRate,
+                                          uint32_t channels,
+                                          audio_io_handle_t id,
+-#ifdef STE_AUDIO
+-                                         uint32_t device,
+-                                         audio_input_clients pInputClientId) :
+-#else
+                                          uint32_t device) :
+-#endif
+     ThreadBase(audioFlinger, id, device, RECORD),
+     mInput(input), mTrack(NULL), mResampler(NULL), mRsmpOutBuffer(NULL), mRsmpInBuffer(NULL),
+     // mRsmpInIndex and mInputBytes set by readInputParameters()
+@@ -6914,9 +6888,6 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
+ {
+     snprintf(mName, kNameLength, "AudioIn_%X", id);
+ 
+-#ifdef STE_AUDIO
+-    mInputClientId = pInputClientId;
+-#endif
+     readInputParameters();
+ }
+ 
+@@ -7875,11 +7846,7 @@ audio_io_handle_t AudioFlinger::openOutput(audio_module_handle_t module,
+         }
+ #endif
+         // the first primary output opened designates the primary hw device
+-#ifdef STE_AUDIO
+-        if ( mPrimaryHardwareDev == NULL ) {
+-#else
+         if ((mPrimaryHardwareDev == NULL) && (flags & AUDIO_OUTPUT_FLAG_PRIMARY)) {
+-#endif
+             ALOGI("Using module %d has the primary audio interface", module);
+             mPrimaryHardwareDev = outHwDev;
+ 
+@@ -8043,50 +8010,11 @@ status_t AudioFlinger::restoreOutput(audio_io_handle_t output)
+     return NO_ERROR;
+ }
+ 
+-#ifdef STE_AUDIO
+-uint32_t *AudioFlinger::addInputClient(uint32_t clientId)
+-{
+-    Mutex::Autolock _l(mLock);
+-
+-    uint32_t *pNewClient = new uint32_t;
+-    if (pNewClient) {
+-        *pNewClient = clientId;
+-        mInputClients.add(pNewClient);
+-    }
+-
+-    return pNewClient;
+-}
+-
+-status_t AudioFlinger::removeInputClient(uint32_t *pClientId)
+-{
+-    status_t result = NO_ERROR;
+-
+-    Mutex::Autolock _l(mLock);
+-
+-    if (pClientId == NULL) {
+-        result = BAD_VALUE;
+-    } else if (mInputClients.remove(pClientId) < 0) {
+-        result = BAD_VALUE;
+-    } else {
+-        // the pointer was found in the vector and is non-NULL, so it must point to memory
+-        // allocated by addInputClient => free it.
+-        delete pClientId;
+-    }
+-
+-    return result;
+-}
+-#endif
+-
+ audio_io_handle_t AudioFlinger::openInput(audio_module_handle_t module,
+                                           audio_devices_t *pDevices,
+                                           uint32_t *pSamplingRate,
+                                           audio_format_t *pFormat,
+-#ifdef STE_AUDIO
+-                                          uint32_t *pChannelMask,
+-                                          audio_input_clients *pInputClientId)
+-#else
+                                           uint32_t *pChannelMask)
+-#endif
+ {
+     status_t status;
+     RecordThread *thread = NULL;
+@@ -8100,10 +8028,6 @@ audio_io_handle_t AudioFlinger::openInput(audio_module_handle_t module,
+     audio_channel_mask_t reqChannels = config.channel_mask;
+     audio_stream_in_t *inStream = NULL;
+     audio_hw_device_t *inHwDev;
+-#ifdef STE_AUDIO
+-    bool returnRecordThread = true;
+-    audio_input_clients inputClientId;
+-#endif
+ 
+     if (pDevices == NULL || *pDevices == 0) {
+         return 0;
+@@ -8115,12 +8039,6 @@ audio_io_handle_t AudioFlinger::openInput(audio_module_handle_t module,
+     if (inHwDev == NULL)
+         return 0;
+ 
+-#ifdef STE_AUDIO
+-    if (pInputClientId != NULL && *pInputClientId == AUDIO_INPUT_CLIENT_PLAYBACK) {
+-        returnRecordThread = false;
+-    }
+-#endif
+-
+     audio_io_handle_t id = nextUniqueId();
+ 
+ #ifndef ICS_AUDIO_BLOB
+@@ -8138,24 +8056,12 @@ audio_io_handle_t AudioFlinger::openInput(audio_module_handle_t module,
+             config.sample_rate,
+             config.format,
+             config.channel_mask,
+-#ifdef STE_AUDIO
+-            status,
+-            pInputClientId);
+-#else
+             status);
+-#endif
+ 
+     // If the input could not be opened with the requested parameters and we can handle the conversion internally,
+     // try to open again with the proposed parameters. The AudioFlinger can resample the input and do mono to stereo
+     // or stereo to mono conversions on 16 bit PCM inputs.
+-#ifdef STE_AUDIO
+-    if (inStream == NULL && status == ALREADY_EXISTS) {
+-        ALOGD("Input already exists");
+-        return 0;
+-    } else if (inStream == NULL && status == BAD_VALUE &&
+-#else
+     if (status == BAD_VALUE &&
+-#endif
+         reqFormat == config.format && config.format == AUDIO_FORMAT_PCM_16_BIT &&
+         (config.sample_rate <= 2 * reqSamplingRate) &&
+ #ifdef QCOM_HARDWARE
+@@ -8189,25 +8095,14 @@ audio_io_handle_t AudioFlinger::openInput(audio_module_handle_t module,
+                                   reqSamplingRate,
+                                   reqChannels,
+                                   id,
+-#ifdef STE_AUDIO
+-                                  device,
+-                                  inputClientId);
+-#else
+                                   device);
+-#endif
+         mRecordThreads.add(id, thread);
+         ALOGV("openInput() created record thread: ID %d thread %p", id, thread);
+         if (pSamplingRate != NULL) *pSamplingRate = reqSamplingRate;
+         if (pFormat != NULL) *pFormat = config.format;
+         if (pChannelMask != NULL) *pChannelMask = reqChannels;
+ 
+-#ifdef STE_AUDIO
+-        if (pInputClientId != NULL) {
+-            *pInputClientId = inputClientId;
+-        }
+-#else
+         input->stream->common.standby(&input->stream->common);
+-#endif
+ 
+         // notify client processes of the new input creation
+         thread->audioConfigChanged_l(AudioSystem::INPUT_OPENED);
+@@ -8217,40 +8112,6 @@ audio_io_handle_t AudioFlinger::openInput(audio_module_handle_t module,
+     return 0;
+ }
+ 
+-#ifdef STE_AUDIO
+-status_t AudioFlinger::closeInput(audio_io_handle_t input, audio_input_clients *inputClientId)
+-{
+-    // keep strong reference on the record thread so that
+-    // it is not destroyed while exit() is executed
+-    Mutex::Autolock _l(mLock);
+-    AudioStreamIn* stream = (AudioStreamIn*)input;
+-    audio_input_clients clientId = (audio_input_clients) *inputClientId;
+-    sp <RecordThread> thread;
+-    thread = checkRecordThread_l(input);
+-    if (thread != NULL) {
+-        stream = thread->getInput();
+-    }
+-    if (inputClientId == NULL) {
+-        if (thread == NULL) {
+-            return BAD_VALUE;
+-        }
+-        ALOGV("closeInput() %d", input);
+-        void *param2 = 0;
+-        audioConfigChanged_l(AudioSystem::INPUT_CLOSED, input, param2);
+-        mRecordThreads.removeItem(input);
+-    }
+-
+-    AudioStreamIn *in = (AudioStreamIn *)stream;
+-    in->hwDev->close_input_stream(in->hwDev, in->stream);
+-    delete in;
+-
+-    if (thread != NULL) {
+-        thread->exit();
+-    }
+-
+-    return NO_ERROR;
+-}
+-#else
+ status_t AudioFlinger::closeInput(audio_io_handle_t input)
+ {
+     // keep strong reference on the record thread so that
+@@ -8279,7 +8140,6 @@ status_t AudioFlinger::closeInput(audio_io_handle_t input)
+ 
+     return NO_ERROR;
+ }
+-#endif
+ 
+ status_t AudioFlinger::setStreamOutput(audio_stream_type_t stream, audio_io_handle_t output)
+ {
+diff --git a/services/audioflinger/AudioFlinger.h b/services/audioflinger/AudioFlinger.h
+index 3ad5a51..32c5da7 100644
+--- a/services/audioflinger/AudioFlinger.h
++++ b/services/audioflinger/AudioFlinger.h
+@@ -183,34 +183,13 @@ public:
+ 
+     virtual status_t restoreOutput(audio_io_handle_t output);
+ 
+-#ifdef STE_AUDIO
+-    virtual uint32_t *addInputClient(uint32_t clientId);
+-
+-    virtual status_t removeInputClient(uint32_t *pClientId);
+-#endif
+-
+     virtual audio_io_handle_t openInput(audio_module_handle_t module,
+                                         audio_devices_t *pDevices,
+                                         uint32_t *pSamplingRate,
+                                         audio_format_t *pFormat,
+-#ifdef STE_AUDIO
+-                                        audio_channel_mask_t *pChannelMask,
+-                                        audio_input_clients *pInputClientId = NULL);
+-
+-    virtual status_t closeInput(audio_io_handle_t input, audio_input_clients *inputClientId = NULL);
+-    virtual size_t readInput(audio_io_handle_t input,
+-                            audio_input_clients inputClientId,
+-                            void *buffer,
+-                            uint32_t bytes,
+-                            uint32_t *pOverwrittenBytes);
+-
+-#else
+                                         audio_channel_mask_t *pChannelMask);
+ 
+     virtual status_t closeInput(audio_io_handle_t input);
+-#endif
+-
+-
+ 
+     virtual status_t setStreamOutput(audio_stream_type_t stream, audio_io_handle_t output);
+ 
+@@ -1551,12 +1530,7 @@ private:
+                         uint32_t sampleRate,
+                         uint32_t channels,
+                         audio_io_handle_t id,
+-#ifdef STE_AUDIO
+-                        uint32_t device,
+-                        audio_input_clients pInputClientId);
+-#else
+                         uint32_t device);
+-#endif
+                 virtual     ~RecordThread();
+ 
+         // Thread
+@@ -1625,9 +1599,6 @@ private:
+                 const int                           mReqChannelCount;
+                 const uint32_t                      mReqSampleRate;
+                 ssize_t                             mBytesRead;
+-#ifdef STE_AUDIO
+-                audio_input_clients                 mInputClientId;
+-#endif
+                 // sync event triggering actual audio capture. Frames read before this event will
+                 // be dropped and therefore not read by the application.
+                 sp<SyncEvent>                       mSyncStartEvent;
+@@ -1847,9 +1818,6 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
+         EffectHandle(const EffectHandle&);
+         EffectHandle& operator =(const EffectHandle&);
+ 
+-#ifdef STE_AUDIO
+-        Mutex               mLock;          // mutex protecting mEffect pointer
+-#endif
+         sp<EffectModule> mEffect;           // pointer to controlled EffectModule
+         sp<IEffectClient> mEffectClient;    // callback interface for client notifications
+         /*const*/ sp<Client> mClient;       // client for shared memory allocation, see disconnect()
+@@ -2161,10 +2129,6 @@ mutable Mutex               mLock;      // mutex for process, commands and handl
+                 int                                 mLPANumChannels;
+                 volatile bool                       mAllChainsLocked;
+ #endif
+-#ifdef STE_AUDIO
+-                SortedVector<uint32_t*> mInputClients;
+-#endif
+-
+                 float       masterVolume_l() const;
+                 float       masterVolumeSW_l() const  { return mMasterVolumeSW; }
+                 bool        masterMute_l() const    { return mMasterMute; }
+diff --git a/services/audioflinger/AudioPolicyService.cpp b/services/audioflinger/AudioPolicyService.cpp
+index 9923de6..a10dfeb 100644
+--- a/services/audioflinger/AudioPolicyService.cpp
++++ b/services/audioflinger/AudioPolicyService.cpp
+@@ -273,12 +273,7 @@ audio_io_handle_t AudioPolicyService::getInput(audio_source_t inputSource,
+                                     audio_format_t format,
+                                     uint32_t channels,
+                                     audio_in_acoustics_t acoustics,
+-#ifdef STE_AUDIO
+-                                    int audioSession,
+-                                    audio_input_clients *inputClientId)
+-#else
+                                     int audioSession)
+-#endif
+ {
+     if (mpAudioPolicy == NULL) {
+         return 0;
+@@ -289,11 +284,7 @@ audio_io_handle_t AudioPolicyService::getInput(audio_source_t inputSource,
+     }
+     Mutex::Autolock _l(mLock);
+     audio_io_handle_t input = mpAudioPolicy->get_input(mpAudioPolicy, inputSource, samplingRate,
+-#ifdef STE_AUDIO
+-                                                       format, channels, acoustics, inputClientId);
+-#else
+                                                        format, channels, acoustics);
+-#endif
+ 
+     if (input == 0) {
+         return input;
+@@ -1020,14 +1011,6 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(AudioCommand *comma
+         for (size_t k = i + 1; k < mAudioCommands.size(); k++) {
+             if (mAudioCommands[k] == removedCommands[j]) {
+                 ALOGV("suppressing command: %d", mAudioCommands[k]->mCommand);
+-#ifdef STE_AUDIO
+-                // for commands that are not filtered,
+-                // command->mParam is deleted in threadLoop
+-                ALOGV("deleting mParam %p for command: %d",
+-                        mAudioCommands[k]->mParam, mAudioCommands[k]->mCommand);
+-                delete mAudioCommands[k]->mParam;
+-                mAudioCommands[k]->mParam = NULL;
+-#endif
+                 mAudioCommands.removeAt(k);
+                 break;
+             }
+@@ -1503,12 +1486,7 @@ static audio_io_handle_t aps_open_input(void *service,
+                                         uint32_t *pSamplingRate,
+                                         audio_format_t *pFormat,
+                                         audio_channel_mask_t *pChannelMask,
+-#ifdef STE_AUDIO
+-                                        audio_in_acoustics_t acoustics,
+-                                        audio_input_clients *inputClientId)
+-#else
+                                         audio_in_acoustics_t acoustics)
+-#endif
+ {
+     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+     if (af == 0) {
+@@ -1516,11 +1494,7 @@ static audio_io_handle_t aps_open_input(void *service,
+         return 0;
+     }
+ 
+-#ifdef STE_AUDIO
+-    return af->openInput((audio_module_handle_t)0, pDevices, pSamplingRate, pFormat, pChannelMask, inputClientId);
+-#else
+     return af->openInput((audio_module_handle_t)0, pDevices, pSamplingRate, pFormat, pChannelMask);
+-#endif
+ }
+ 
+ static audio_io_handle_t aps_open_input_on_module(void *service,
+@@ -1528,12 +1502,7 @@ static audio_io_handle_t aps_open_input_on_module(void *service,
+                                                   audio_devices_t *pDevices,
+                                                   uint32_t *pSamplingRate,
+                                                   audio_format_t *pFormat,
+-#ifdef STE_AUDIO
+-                                                  audio_channel_mask_t *pChannelMask,
+-                                                  audio_input_clients *inputClientId)
+-#else
+                                                   audio_channel_mask_t *pChannelMask)
+-#endif
+ {
+     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+     if (af == 0) {
+@@ -1541,29 +1510,16 @@ static audio_io_handle_t aps_open_input_on_module(void *service,
+         return 0;
+     }
+ 
+-#ifdef STE_AUDIO
+-    return af->openInput(module, pDevices, pSamplingRate, pFormat, pChannelMask, inputClientId);
+-#else
+     return af->openInput(module, pDevices, pSamplingRate, pFormat, pChannelMask);
+-#endif
+ }
+ 
+-#ifdef STE_AUDIO
+-static int aps_close_input(void *service, audio_io_handle_t input,
+-                            audio_input_clients *inputClientId = NULL)
+-#else
+ static int aps_close_input(void *service, audio_io_handle_t input)
+-#endif
+ {
+     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+     if (af == 0)
+         return PERMISSION_DENIED;
+ 
+-#ifdef STE_AUDIO
+-    return af->closeInput(input, inputClientId);
+-#else
+     return af->closeInput(input);
+-#endif
+ }
+ 
+ static int aps_set_stream_output(void *service, audio_stream_type_t stream,
+diff --git a/services/audioflinger/AudioPolicyService.h b/services/audioflinger/AudioPolicyService.h
+index 0888bf0..0ece974 100644
+--- a/services/audioflinger/AudioPolicyService.h
++++ b/services/audioflinger/AudioPolicyService.h
+@@ -80,12 +80,7 @@ public:
+                                     uint32_t channels = 0,
+                                     audio_in_acoustics_t acoustics =
+                                             (audio_in_acoustics_t)0 /*AUDIO_IN_ACOUSTICS_NONE*/,
+-#ifdef STE_AUDIO
+-                                    int audioSession = 0,
+-                                    audio_input_clients *inputClientId = NULL);
+-#else
+                                     int audioSession = 0);
+-#endif
+     virtual status_t startInput(audio_io_handle_t input);
+     virtual status_t stopInput(audio_io_handle_t input);
+     virtual void releaseInput(audio_io_handle_t input);
+diff --git a/services/camera/libcameraservice/CameraHardwareInterface.h b/services/camera/libcameraservice/CameraHardwareInterface.h
+index 356bc30..a340091 100755
+--- a/services/camera/libcameraservice/CameraHardwareInterface.h
++++ b/services/camera/libcameraservice/CameraHardwareInterface.h
+@@ -664,9 +664,6 @@ private:
+ 
+     static int __set_usage(struct preview_stream_ops* w, int usage)
+     {
+-#ifdef SEMC_ICS_CAMERA_BLOB
+-        usage |= GRALLOC_USAGE_PRIVATE_0;
+-#endif
+         ANativeWindow *a = anw(w);
+         return native_window_set_usage(a, usage);
+     }
+diff --git a/services/camera/libcameraservice/CameraService.cpp b/services/camera/libcameraservice/CameraService.cpp
+index 5a37430..7e8d47e 100755
+--- a/services/camera/libcameraservice/CameraService.cpp
++++ b/services/camera/libcameraservice/CameraService.cpp
+@@ -328,14 +328,13 @@ void CameraService::loadSound() {
+     if (mSoundRef++) return;
+ 
+     char value[PROPERTY_VALUE_MAX];
+-    property_get("persist.camera.shutter.disable", value, "0");
+-    int disableSound = atoi(value);
++    property_get("persist.sys.camera-sound", value, "1");
++    int enableSound = atoi(value);
+ 
+-    if(!disableSound) {
++    if(enableSound) {
+         mSoundPlayer[SOUND_SHUTTER] = newMediaPlayer("/system/media/audio/ui/camera_click.ogg");
+         mSoundPlayer[SOUND_RECORDING] = newMediaPlayer("/system/media/audio/ui/VideoRecord.ogg");
+-    }
+-    else {
++    } else {
+         mSoundPlayer[SOUND_SHUTTER] = NULL;
+         mSoundPlayer[SOUND_RECORDING] = NULL;
+     }
+@@ -1224,7 +1223,9 @@ void CameraService::Client::handleShutter(void) {
+         c->notifyCallback(CAMERA_MSG_SHUTTER, 0, 0);
+         if (!lockIfMessageWanted(CAMERA_MSG_SHUTTER)) return;
+     }
++#ifndef SAMSUNG_CAMERA_QCOM
+     disableMsgType(CAMERA_MSG_SHUTTER);
++#endif
+ 
+     mLock.unlock();
+ }
+@@ -1496,4 +1497,4 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
+     return NO_ERROR;
+ }
+ 
+-}; // namespace android
++}; // namespace android
+\ No newline at end of file
+-- 
+2.1.2
