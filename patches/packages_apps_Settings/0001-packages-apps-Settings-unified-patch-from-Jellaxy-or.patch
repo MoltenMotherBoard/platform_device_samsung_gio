@@ -1,0 +1,1095 @@
+From 5be733a6222cc820510afdb5815ad99a63bf0889 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Sat, 4 Oct 2014 17:11:08 +0200
+Subject: [PATCH] packages/apps/Settings: unified patch from Jellaxy original
+ branch
+
+---
+ Android.mk                                         |   2 +-
+ res/layout/data_usage_chart.xml                    |   1 -
+ res/values-el/arrays.xml                           |  34 +++---
+ res/values-el/strings.xml                          | 136 +++++++++++----------
+ res/values-pl/strings.xml                          |  80 ++++++------
+ res/values-pt/arrays.xml                           |   2 +-
+ .../android/settings/cmstats/AnonymousStats.java   |   9 ++
+ .../android/settings/cmstats/ReportingService.java |  62 +++++-----
+ .../settings/cmstats/ReportingServiceManager.java  |  16 +--
+ src/com/android/settings/cmstats/Utilities.java    |  18 ++-
+ src/com/android/settings/widget/ChartGridView.java |   8 +-
+ 11 files changed, 198 insertions(+), 170 deletions(-)
+
+diff --git a/Android.mk b/Android.mk
+index 5206231..38732bb 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -2,7 +2,7 @@ LOCAL_PATH:= $(call my-dir)
+ include $(CLEAR_VARS)
+ 
+ LOCAL_JAVA_LIBRARIES := bouncycastle
+-LOCAL_STATIC_JAVA_LIBRARIES := guava android-support-v4 libGoogleAnalyticsV2
++LOCAL_STATIC_JAVA_LIBRARIES := guava android-support-v4
+ 
+ LOCAL_MODULE_TAGS := optional
+ 
+diff --git a/res/layout/data_usage_chart.xml b/res/layout/data_usage_chart.xml
+index 2501e9d..7a2f087 100644
+--- a/res/layout/data_usage_chart.xml
++++ b/res/layout/data_usage_chart.xml
+@@ -37,7 +37,6 @@
+         android:layout_gravity="left|bottom"
+         settings:primaryDrawable="@drawable/data_grid_primary"
+         settings:secondaryDrawable="@drawable/data_grid_secondary"
+-        settings:borderDrawable="@drawable/data_grid_border"
+         settings:labelColor="@android:color/holo_blue_light" />
+ 
+     <com.android.settings.widget.ChartNetworkSeriesView
+diff --git a/res/values-el/arrays.xml b/res/values-el/arrays.xml
+index 01cae99..2283b26 100644
+--- a/res/values-el/arrays.xml
++++ b/res/values-el/arrays.xml
+@@ -81,13 +81,13 @@
+   </string-array>
+   <string-array name="wifi_status">
+     <item msgid="1922181315419294640"></item>
+-    <item msgid="8934131797783724664">"Σάρωση\u2026"</item>
+-    <item msgid="8513729475867537913">"Σύνδεση\u2026"</item>
+-    <item msgid="515055375277271756">"Έλεγχος ταυτότητας\u2026"</item>
+-    <item msgid="1943354004029184381">"Λήψη διεύθυνσης IP\u2026"</item>
++    <item msgid="8934131797783724664">"Σάρωση..."</item>
++    <item msgid="8513729475867537913">"Σύνδεση..."</item>
++    <item msgid="515055375277271756">"Έλεγχος ταυτότητας..."</item>
++    <item msgid="1943354004029184381">"Λήψη διεύθυνσης IP..."</item>
+     <item msgid="4221763391123233270">"Συνδεδεμένο"</item>
+     <item msgid="624838831631122137">"Σε αναστολή"</item>
+-    <item msgid="7979680559596111948">"Αποσύνδεση\u2026"</item>
++    <item msgid="7979680559596111948">"Αποσύνδεση..."</item>
+     <item msgid="1634960474403853625">"Αποσυνδέθηκε"</item>
+     <item msgid="746097431216080650">"Ανεπιτυχής"</item>
+     <item msgid="6367044185730295334">"Αποκλεισμένο"</item>
+@@ -95,13 +95,13 @@
+   </string-array>
+   <string-array name="wifi_status_with_ssid">
+     <item msgid="7714855332363650812"></item>
+-    <item msgid="8878186979715711006">"Σάρωση\u2026"</item>
+-    <item msgid="355508996603873860">"Σύνδεση σε <xliff:g id="NETWORK_NAME">%1$s</xliff:g>\u2026"</item>
+-    <item msgid="554971459996405634">"Έλεγχος ταυτότητας με <xliff:g id="NETWORK_NAME">%1$s</xliff:g>\u2026"</item>
+-    <item msgid="7928343808033020343">"Λήψη διεύθυνσης IP από <xliff:g id="NETWORK_NAME">%1$s</xliff:g>\u2026"</item>
++    <item msgid="8878186979715711006">"Σάρωση..."</item>
++    <item msgid="355508996603873860">"Σύνδεση σε <xliff:g id="NETWORK_NAME">%1$s</xliff:g>..."</item>
++    <item msgid="554971459996405634">"Έλεγχος ταυτότητας με <xliff:g id="NETWORK_NAME">%1$s</xliff:g>..."</item>
++    <item msgid="7928343808033020343">"Λήψη διεύθυνσης IP από <xliff:g id="NETWORK_NAME">%1$s</xliff:g>..."</item>
+     <item msgid="8937994881315223448">"Συνδεδεμένο σε <xliff:g id="NETWORK_NAME">%1$s</xliff:g>"</item>
+     <item msgid="1330262655415760617">"Σε αναστολή"</item>
+-    <item msgid="7698638434317271902">"Αποσύνδεση από <xliff:g id="NETWORK_NAME">%1$s</xliff:g>\u2026"</item>
++    <item msgid="7698638434317271902">"Αποσύνδεση από <xliff:g id="NETWORK_NAME">%1$s</xliff:g>..."</item>
+     <item msgid="197508606402264311">"Αποσυνδέθηκε"</item>
+     <item msgid="8578370891960825148">"Ανεπιτυχής"</item>
+     <item msgid="5660739516542454527">"Αποκλεισμένο"</item>
+@@ -160,11 +160,11 @@
+   </string-array>
+   <string-array name="wifi_ip_settings">
+     <item msgid="3906714200993111074">"DHCP"</item>
+-    <item msgid="628395202971532382">"Στατική"</item>
++    <item msgid="628395202971532382">"Στατικό"</item>
+   </string-array>
+   <string-array name="wifi_proxy_settings">
+     <item msgid="4473276491748503377">"Κανένας"</item>
+-    <item msgid="8673874894887358090">"Μη αυτόματος"</item>
++    <item msgid="8673874894887358090">"Χειροκίνητος"</item>
+   </string-array>
+   <string-array name="emergency_tone_entries">
+     <item msgid="5165439859689033665">"Απενεργοποιημένο"</item>
+@@ -247,14 +247,14 @@
+   </string-array>
+   <string-array name="vpn_states">
+     <item msgid="8621078286418985762">"Αποσυνδέθηκε"</item>
+-    <item msgid="6692305604213080515">"Προετοιμασία\u2026"</item>
+-    <item msgid="8001704909356800092">"Γίνεται σύνδεση\u2026"</item>
++    <item msgid="6692305604213080515">"Προετοιμασία..."</item>
++    <item msgid="8001704909356800092">"Γίνεται σύνδεση..."</item>
+     <item msgid="4039737283841672166">"Σε σύνδεση"</item>
+     <item msgid="4042143101664725090">"Λήξη ορίου χρόνου"</item>
+     <item msgid="7664124146786465092">"Ανεπιτυχής"</item>
+   </string-array>
+ 
+-    <!-- CYANOGENMOD EDITS START -->
++    <!-- **** CYANOGENMOD EDITS START **** -->
+ 
+     <!-- Wi-Fi settings. Presented as a list dialog to the user to choose the Wi-Fi region code. -->
+     <string-array name="wifi_countrycode_entries">
+@@ -356,7 +356,7 @@
+     </string-array>
+ 
+     <string-array name="haptic_feedback_entries">
+-        <item>Χρήση ρύθμισης συστήματος</item>
++        <item>Χρήση γενικής ρύθμισης</item>
+         <item>Ενεργοποιημένη</item>
+         <item>Απενεργοποιημένη</item>
+     </string-array>
+@@ -391,5 +391,5 @@
+         <item>Χρήση εσωτερικού GPS</item>
+     </string-array>
+ 
+-    <!-- CYANOGENMOD EDITS END -->
++    <!-- **** CYANOGENMOD EDITS END **** -->
+ </resources>
+diff --git a/res/values-el/strings.xml b/res/values-el/strings.xml
+index ac02764..99ef450 100644
+--- a/res/values-el/strings.xml
++++ b/res/values-el/strings.xml
+@@ -128,10 +128,10 @@
+     <string name="bluetooth_connected_no_a2dp" msgid="4576188601581440337">"Συνδεδεμένο (όχι μέσα)"</string>
+     <string name="bluetooth_connected_no_headset_no_a2dp" msgid="9195757766755553810">"Συνδεδεμένο (χωρίς τηλέφωνο ή πολυμέσα)"</string>
+     <string name="bluetooth_disconnected" msgid="6557104142667339895">"Αποσυνδέθηκε"</string>
+-    <string name="bluetooth_disconnecting" msgid="8913264760027764974">"Αποσύνδεση\u2026"</string>
+-    <string name="bluetooth_connecting" msgid="8555009514614320497">"Σύνδεση\u2026"</string>
++    <string name="bluetooth_disconnecting" msgid="8913264760027764974">"Αποσύνδεση..."</string>
++    <string name="bluetooth_connecting" msgid="8555009514614320497">"Σύνδεση..."</string>
+     <string name="bluetooth_unknown" msgid="644716244548801421"></string>
+-    <string name="bluetooth_pairing" msgid="1426882272690346242">"Σύζευξη\u2026"</string>
++    <string name="bluetooth_pairing" msgid="1426882272690346242">"Σύζευξη..."</string>
+     <string name="bluetooth_device" msgid="5291950341750186887">"Συσκευή Bluetooth χωρίς όνομα"</string>
+     <string name="progress_scanning" msgid="192587958424295789">"Αναζήτηση"</string>
+     <string name="bluetooth_no_devices_found" msgid="1085232930277181436">"Δεν βρέθηκαν συσκευές Bluetooth κοντά."</string>
+@@ -150,8 +150,8 @@
+     <string name="bluetooth_ask_enablement_and_discovery" product="default" msgid="3040361003987241057">"Κάποια εφαρμογή του τηλεφώνου σας απαιτεί την ενεργοποίηση του Bluetooth και τη δυνατότητα ανίχνευσης του τηλεφώνου σας από άλλες συσκευές για <xliff:g id="TIMEOUT">%1$d</xliff:g> δευτερόλεπτα. Να επιτραπεί;"</string>
+     <string name="bluetooth_ask_enablement_and_lasting_discovery" product="tablet" msgid="7254712987802497615">"Μια εφαρμογή από το tablet σας θέλει να ενεργοποιήσει το Bluetooth και να καταστήσει το tablet σας ανιχνεύσιμο από άλλες συσκευές. Να επιτραπεί;"</string>
+     <string name="bluetooth_ask_enablement_and_lasting_discovery" product="default" msgid="3947789545028519103">"Κάποια εφαρμογή του τηλεφώνου σας απαιτεί την ενεργοποίηση του Bluetooth και τη δυνατότητα ανίχνευσης του τηλεφώνου σας από άλλες συσκευές. Να επιτραπεί;"</string>
+-    <string name="bluetooth_turning_on" msgid="4850574877288036646">"Ενεργοποίηση του Bluetooth\u2026"</string>
+-    <string name="bluetooth_turning_off" msgid="2337747302892025192">"Απενεργοποίηση Bluetooth\u2026"</string>
++    <string name="bluetooth_turning_on" msgid="4850574877288036646">"Ενεργοποίηση του Bluetooth..."</string>
++    <string name="bluetooth_turning_off" msgid="2337747302892025192">"Απενεργοποίηση Bluetooth..."</string>
+     <string name="bluetooth_auto_connect" msgid="40711424456733571">"Αυτόματη σύνδεση"</string>
+     <string name="bluetooth_connection_permission_request" msgid="4747918249032890077">"Αίτημα σύνδεσης Bluetooth"</string>
+     <string name="bluetooth_connection_notif_message" msgid="3687933246423942977">"Αγγίξτε για να συνδεθείτε στη συσκευή \"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>\""</string>
+@@ -166,6 +166,8 @@
+     <string name="normal_date_format" msgid="7636406984925498359">"Τοπική (<xliff:g id="DATE">%s</xliff:g>)"</string>
+     <string name="display_preview_label" msgid="1127597250917274792">"Προεπισκόπηση:"</string>
+     <string name="display_font_size_label" msgid="8941851418397475389">"Μέγεθος γραμματοσειράς:"</string>
++    <!-- no translation found for intent_sender_data_label (6332324780477289261) -->
++    <skip />
+     <string name="intent_sender_sendbroadcast_text" msgid="1415735148895872715">"Αποστολή <xliff:g id="BROADCAST">broadcast</xliff:g>"</string>
+     <string name="intent_sender_action_label" msgid="616458370005452389">"<xliff:g id="ACTION">Action</xliff:g>:"</string>
+     <string name="intent_sender_startactivity_text" msgid="5080516029580421895">"Εκκίνηση <xliff:g id="ACTIVITY">activity</xliff:g>"</string>
+@@ -220,7 +222,7 @@
+     <string name="radio_info_toggle_dns_check_label" msgid="8292252930563286858">"Αλλαγή ελέγχου DNS"</string>
+     <string name="oem_radio_info_label" msgid="6163141792477958941">"Πληροφορίες/ρυθμίσεις για OEM"</string>
+     <string name="band_mode_title" msgid="954174198903776205">"Ορισμός ζώνης GSM/UMTS"</string>
+-    <string name="band_mode_loading" msgid="548764766363847336">"Φόρτωση λίστας ζωνών\u2026"</string>
++    <string name="band_mode_loading" msgid="548764766363847336">"Φόρτωση λίστας ζωνών..."</string>
+     <string name="band_mode_set" msgid="5730560180249458484">"Ορισμός"</string>
+     <string name="band_mode_failed" msgid="1495968863884716379">"Ανεπιτυχής"</string>
+     <string name="band_mode_succeeded" msgid="2701016190055887575">"Επιτυχής"</string>
+@@ -238,7 +240,7 @@
+     <string name="sdcard_settings_bad_removal_status" product="default" msgid="5145797653495907970">"Η κάρτα SD αφαιρέθηκε ενώ βρισκόταν σε χρήση!"</string>
+     <string name="sdcard_settings_used_bytes_label" msgid="8820289486001170836">"Αριθμός bytes που χρησιμοποιήθηκαν:"</string>
+     <string name="sdcard_settings_scanning_status" product="nosdcard" msgid="7503429447676219564">"Σάρ. αποθ. χώρ. USB για πολυμ."</string>
+-    <string name="sdcard_settings_scanning_status" product="default" msgid="2763464949274455656">"Σάρωση κάρτας SD για πολυμέσα\u2026"</string>
++    <string name="sdcard_settings_scanning_status" product="default" msgid="2763464949274455656">"Σάρωση κάρτας SD για πολυμέσα..."</string>
+     <string name="sdcard_settings_read_only_status" product="nosdcard" msgid="3624143937437417788">"Χώρος αποθ. USB μόνο για ανάγ."</string>
+     <string name="sdcard_settings_read_only_status" product="default" msgid="4518291824764698112">"Η κάρτα SD που προσαρτήθηκε είναι μόνο για ανάγνωση."</string>
+     <string name="skip_label" msgid="47510779345218297">"Παράλ"</string>
+@@ -258,7 +260,7 @@
+     <string name="settings_label_launcher" msgid="8344735489639482340">"Ρυθμίσεις"</string>
+     <string name="settings_shortcut" msgid="3936651951364030415">"Συντόμευση ρυθμίσεων"</string>
+     <string name="airplane_mode" msgid="8837269988154128601">"Λειτουργία πτήσης"</string>
+-    <string name="radio_controls_title" msgid="6889937359495515769">"Περισσότερα\u2026"</string>
++    <string name="radio_controls_title" msgid="6889937359495515769">"Περισσότερα..."</string>
+     <string name="wireless_networks_settings_title" msgid="3643009077742794212">"Ασύρματο και δίκτυα"</string>
+     <string name="radio_controls_summary" msgid="2998818677094465517">"Διαχείριση Wi-Fi, Bluetooth, λειτουργίας πτήσης, δικτύων κινητής τηλεφωνίας και VPN"</string>
+     <string name="roaming" msgid="3596055926335478572">"Περιαγωγή δεδομένων"</string>
+@@ -293,7 +295,7 @@
+     <string name="biometric_weak_liveliness_summary" msgid="4199587000948042325">"Απαιτείται βλεφάρισμα ματιών κατά το ξεκλείδωμα"</string>
+     <string name="lock_after_timeout" msgid="4590337686681194648">"Κλειδώνει αυτόματα"</string>
+     <string name="lock_after_timeout_summary" msgid="6128431871360905631">"<xliff:g id="TIMEOUT_STRING">%1$s</xliff:g> μετά την κατάσταση αναστολής λειτουργίας"</string>
+-    <string name="show_owner_info_on_lockscreen_label" msgid="5074906168357568434">"Εμφάνιση πληροφοριών κατόχου στην οθόνη κλειδώματος"</string>
++    <string name="show_owner_info_on_lockscreen_label" msgid="5074906168357568434">"Εμφάνιση πληροφοριών κατόχου στην οθόνη κλειδώμ."</string>
+     <string name="owner_info_settings_title" msgid="2723190010708381889">"Στοιχεία κατόχου"</string>
+     <string name="owner_info_settings_summary" msgid="3800834657847339570"></string>
+     <string name="owner_info_settings_edit_text_hint" msgid="4608681417960923911">"Εισάγετε κείμενο για εμφάνιση σε οθόνη κλειδώματος"</string>
+@@ -431,7 +433,7 @@
+     <string name="bluetooth_connecting_error_message" msgid="229861986106185022">"Δεν ήταν δυνατή η σύνδεση με τη συσκευή <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
+     <string name="bluetooth_preference_scan_title" msgid="2277464653118896016">"Ανίχνευση για συσκευές"</string>
+     <string name="bluetooth_search_for_devices" msgid="5957007154213560390">"Αναζήτηση συσκευών"</string>
+-    <string name="bluetooth_searching_for_devices" msgid="9203739709307871727">"Αναζήτηση\u2026"</string>
++    <string name="bluetooth_searching_for_devices" msgid="9203739709307871727">"Αναζήτηση..."</string>
+     <string name="bluetooth_preference_device_settings" msgid="907776049862799122">"Ρυθμίσεις συσκευής"</string>
+     <string name="bluetooth_preference_paired_devices" msgid="1970524193086791964">"Συσκευές σε ζεύγη"</string>
+     <string name="bluetooth_preference_found_devices" msgid="1647983835063249680">"Διαθέσιμες συσκευές"</string>
+@@ -440,11 +442,11 @@
+     <string name="bluetooth_device_context_pair_connect" msgid="7611522504813927727">"Σύζευξη και σύνδεση"</string>
+     <string name="bluetooth_device_context_unpair" msgid="662992425948536144">"Διακοπή σύζευξης"</string>
+     <string name="bluetooth_device_context_disconnect_unpair" msgid="7644014238070043798">"Αποσύνδεση &amp; διακοπή σύζευξης"</string>
+-    <string name="bluetooth_device_context_connect_advanced" msgid="2643129703569788771">"Επιλογές\u2026"</string>
++    <string name="bluetooth_device_context_connect_advanced" msgid="2643129703569788771">"Επιλογές..."</string>
+     <string name="bluetooth_menu_advanced" msgid="8572178316357220524">"Για προχωρημένους"</string>
+     <string name="bluetooth_advanced_titlebar" msgid="2142159726881547669">"Προηγμένες ρυθμίσεις Bluetooth"</string>
+     <string name="bluetooth_empty_list_bluetooth_off" msgid="4793562956642282639">"Για να δείτε τις συσκευές, ενεργοποιήστε το Bluetooth."</string>
+-    <string name="bluetooth_connect_specific_profiles_title" msgid="6952214406025825164">"Σύνδεση σε\u2026"</string>
++    <string name="bluetooth_connect_specific_profiles_title" msgid="6952214406025825164">"Σύνδεση σε..."</string>
+     <string name="bluetooth_profile_a2dp" msgid="2031475486179830674">"Ήχος πολυμέσων"</string>
+     <string name="bluetooth_profile_headset" msgid="8658779596261212609">"Ήχος τηλεφώνου"</string>
+     <string name="bluetooth_profile_opp" msgid="9168139293654233697">"Μεταφορά αρχείου"</string>
+@@ -498,8 +500,8 @@
+     <string name="wifi_settings_title" msgid="4351120897298124250">"Wi-Fi"</string>
+     <string name="wifi_settings_summary" msgid="668767638556052820">"Ορισμός &amp; διαχείριση ασύρματων σημείων πρόσβασης"</string>
+     <string name="wifi_setup_wizard_title" msgid="70277346338812325">"Επιλογή Wi-Fi"</string>
+-    <string name="wifi_starting" msgid="6716593470710880000">"Ενεργοποίηση του Wi-Fi\u2026"</string>
+-    <string name="wifi_stopping" msgid="244864762599017659">"Απενεργοποίηση του Wi-Fi\u2026"</string>
++    <string name="wifi_starting" msgid="6716593470710880000">"Ενεργοποίηση του Wi-Fi..."</string>
++    <string name="wifi_stopping" msgid="244864762599017659">"Απενεργοποίηση του Wi-Fi..."</string>
+     <string name="wifi_error" msgid="3207971103917128179">"Σφάλμα"</string>
+     <string name="wifi_in_airplane_mode" msgid="8652520421778203796">"Σε λειτουργία πτήσης"</string>
+     <string name="wifi_fail_to_scan" msgid="1265540342578081461">"Δεν είναι δυνατή η σάρωση για δίκτυα"</string>
+@@ -520,16 +522,16 @@
+     <string name="wifi_menu_forget" msgid="8736964302477327114">"Διαγραφή δικτύου από τη μνήμη"</string>
+     <string name="wifi_menu_modify" msgid="2068554918652440105">"Τροποποίηση δικτύου"</string>
+     <string name="wifi_empty_list_wifi_off" msgid="4722299515264875943">"Για να δείτε τα διαθέσιμα δίκτυα, ενεργοποιήστε το Wi-Fi."</string>
+-    <string name="wifi_empty_list_wifi_on" msgid="3354911729026237372">"Αναζήτηση για δίκτυα Wi-Fi\u2026"</string>
+-    <string name="wifi_other_network" msgid="1048006316504242214">"Άλλο δίκτυο\u2026"</string>
++    <string name="wifi_empty_list_wifi_on" msgid="3354911729026237372">"Αναζήτηση για δίκτυα Wi-Fi…"</string>
++    <string name="wifi_other_network" msgid="1048006316504242214">"Άλλο δίκτυο…"</string>
+     <string name="wifi_more" msgid="3195296805089107950">"Περισσότερα"</string>
+     <string name="wifi_setup_wps" msgid="8128702488486283957">"Αυτόματη ρύθμιση (WPS)"</string>
+     <string name="wifi_show_advanced" msgid="1793703023711426246">"Εμφάνιση σύνθετων επιλογών"</string>
+     <string name="wifi_wps_setup_title" msgid="6034518116333042484">"Ρύθμιση προστατευόμενου Wi-Fi"</string>
+-    <string name="wifi_wps_setup_msg" msgid="315174329121275092">"Έναρξη WPS\u2026"</string>
++    <string name="wifi_wps_setup_msg" msgid="315174329121275092">"Έναρξη WPS…"</string>
+     <string name="wifi_wps_onstart_pbc" msgid="7204827509934892103">"Πατήστε ο κουμπί ρύθμισης προστατευόμενου Wi-Fi στον δρομολογητή σας. Ενδέχεται να ονομάζεται \"WPS\" ή να περιέχει αυτό το σύμβολο:"</string>
+     <string name="wifi_wps_onstart_pin" msgid="8116564886303972764">"Εισαγάγετε τον κωδικό PIN <xliff:g id="NUMBER">%1$s</xliff:g> στον δρομολογητή σας Wi-Fi. Η ολοκλήρωση της εγκατάστασης μπορεί να διαρκέσει έως και δύο λεπτά."</string>
+-    <string name="wifi_wps_complete" msgid="2388138550456729134">"Επιτυχία WPS. Σύνδεση στο δίκτυο\u2026"</string>
++    <string name="wifi_wps_complete" msgid="2388138550456729134">"Επιτυχία WPS. Σύνδεση στο δίκτυο…"</string>
+     <string name="wifi_wps_connected" msgid="5754399645462924103">"Σύνδεση στο δίκτυο Wi-Fi <xliff:g id="NETWORK_NAME">%s</xliff:g>"</string>
+     <string name="wifi_wps_in_progress" msgid="2944576520214787628">"Η ρύθμιση WPS βρίσκεται ήδη σε εξέλιξη και ενδεχομένως να χρειαστούν έως και δύο λεπτά προκειμένου να ολοκληρωθεί"</string>
+     <string name="wifi_wps_failed_generic" msgid="5668775022238832527">"Αποτυχία WPS. Προσπαθήστε ξανά σε λίγα λεπτά."</string>
+@@ -592,7 +594,7 @@
+     <string name="wifi_p2p_device_info" msgid="3191876744469364173">"Στοιχεία συσκευής"</string>
+     <string name="wifi_p2p_persist_network" msgid="1646424791818168590">"Απομνημόνευση αυτής της σύνδεσης"</string>
+     <string name="wifi_p2p_menu_search" msgid="3436429984738771974">"Αναζήτηση συσκευών"</string>
+-    <string name="wifi_p2p_menu_searching" msgid="2396704492143633876">"Αναζήτηση\u2026"</string>
++    <string name="wifi_p2p_menu_searching" msgid="2396704492143633876">"Αναζήτηση…"</string>
+     <string name="wifi_p2p_menu_rename" msgid="8448896306960060415">"Μετονομασία συσκευής"</string>
+     <string name="wifi_p2p_peer_devices" msgid="299526878463303432">"Ομότιμες συσκευές"</string>
+     <string name="wifi_p2p_failed_connect_message" msgid="8921447388048243547">"Δεν ήταν δυνατή η σύνδεση."</string>
+@@ -748,7 +750,7 @@
+     <string name="sd_memory" product="default" msgid="151871913888051515">"Κάρτα SD"</string>
+     <string name="memory_available" msgid="5052397223077021181">"Διαθέσιμο"</string>
+     <string name="memory_size" msgid="6629067715017232195">"Συνολικός χώρος"</string>
+-    <string name="memory_calculating_size" msgid="2188358544203768588">"Υπολογισμός\u2026"</string>
++    <string name="memory_calculating_size" msgid="2188358544203768588">"Υπολογισμός..."</string>
+     <string name="memory_apps_usage" msgid="2348501997988663688">"Εφαρμογές (δεδομένα εφαρμογών και περιεχόμενο μέσων)"</string>
+     <string name="memory_media_usage" msgid="3738830697707880405">"Μέσα"</string>
+     <string name="memory_downloads_usage" msgid="3755173051677533027">"Λήψεις"</string>
+@@ -921,11 +923,11 @@
+     <string name="terms_title" msgid="7697580845616764642">"Όροι και προϋποθέσεις"</string>
+     <string name="settings_license_activity_title" msgid="7553683406244228650">"Άδειες λογισμ.ανοικτ.κώδ."</string>
+     <string name="settings_license_activity_unavailable" msgid="4210539215951487627">"Παρουσιάστηκε ένα πρόβλημα κατά τη φόρτωση των αδειών."</string>
+-    <string name="settings_license_activity_loading" msgid="3337535809093591740">"Φόρτωση\u2026"</string>
++    <string name="settings_license_activity_loading" msgid="3337535809093591740">"Φόρτωση..."</string>
+     <string name="settings_safetylegal_title" msgid="1289483965535937431">"Πληροφορίες ασφάλειας"</string>
+     <string name="settings_safetylegal_activity_title" msgid="6901214628496951727">"Πληροφορίες ασφάλειας"</string>
+     <string name="settings_safetylegal_activity_unreachable" msgid="232523852222964470">"Δεν είστε συνδεδεμένοι σε υπηρεσία δεδομένων. Για να προβάλετε αυτές τις πληροφορίες τώρα, μεταβείτε στο %s από οποιονδήποτε υπολογιστή με σύνδεση στο Διαδίκτυο."</string>
+-    <string name="settings_safetylegal_activity_loading" msgid="8059022597639516348">"Φόρτωση\u2026"</string>
++    <string name="settings_safetylegal_activity_loading" msgid="8059022597639516348">"Φόρτωση..."</string>
+     <string name="lockpassword_choose_your_password_header" msgid="8624900666929394990">"Επιλέξτε τον κωδικό πρόσβασης"</string>
+     <string name="lockpassword_choose_your_pattern_header" msgid="6949761069941694050">"Επιλέξτε το μοτίβο σας"</string>
+     <string name="lockpassword_choose_your_pin_header" msgid="7598849519816138302">"Επιλέξτε τον αριθμό PIN"</string>
+@@ -1033,7 +1035,7 @@
+     <string name="internal_storage" msgid="1584700623164275282">"Εσωτερικός αποθ. χώρος"</string>
+     <string name="sd_card_storage" product="nosdcard" msgid="2673203150465132465">"Αποθ. χώρος USB"</string>
+     <string name="sd_card_storage" product="default" msgid="7623513618171928235">"Κάρ. χώρ. απ. SD"</string>
+-    <string name="recompute_size" msgid="7722567982831691718">"Εκ νέου υπολογισμός μεγέθους\u2026"</string>
++    <string name="recompute_size" msgid="7722567982831691718">"Εκ νέου υπολογισμός μεγέθους..."</string>
+     <string name="clear_data_dlg_title" msgid="5605258400134511197">"Διαγραφή δεδομένων εφαρμογής;"</string>
+     <string name="clear_data_dlg_text" msgid="8847257251846779938">"Όλα τα δεδομένα της εφαρμογής θα διαγραφούν μόνιμα. Αυτό περιλαμβάνει όλα τα αρχεία, τις ρυθμίσεις, τους λογαριασμούς, τις βάσεις δεδομένων κλπ."</string>
+     <string name="dlg_ok" msgid="2402639055725653590">"OK"</string>
+@@ -1053,7 +1055,7 @@
+     <string name="join_many_items_last" msgid="5925635036718502724">"<xliff:g id="ALL_BUT_LAST_ITEM">%1$s</xliff:g> και <xliff:g id="LAST_ITEM_0">%2$s</xliff:g>"</string>
+     <string name="join_many_items_first" msgid="4333907712038448660">"<xliff:g id="FIRST_ITEM">%1$s</xliff:g>, <xliff:g id="ALL_BUT_FIRST_AND_LAST_ITEM">%2$s</xliff:g>"</string>
+     <string name="join_many_items_middle" msgid="7556692394478220814">"<xliff:g id="ADDED_ITEM">%1$s</xliff:g>, <xliff:g id="REST_OF_ITEMS">%2$s</xliff:g>"</string>
+-    <string name="computing_size" msgid="1599186977475211186">"Υπολογισμός\u2026"</string>
++    <string name="computing_size" msgid="1599186977475211186">"Υπολογισμός..."</string>
+     <string name="invalid_size_value" msgid="7563537715280712285">"Δεν ήταν δυνατός ο υπολογισμός του μεγέθους του πακέτου."</string>
+     <string name="empty_list_msg" msgid="5993162337235907160">"Δεν έχετε εγκαταστήσει εφαρμογές τρίτων μερών."</string>
+     <string name="version_text" msgid="9189073826278676425">"έκδοση <xliff:g id="VERSION_NUM">%1$s</xliff:g>"</string>
+@@ -1086,9 +1088,13 @@
+     <string name="cached" msgid="1059590879740175019">"Διαδικασία προσωρινά αποθηκευμένου φόντου"</string>
+     <string name="no_running_services" msgid="2059536495597645347">"Τίποτα σε εξέλιξη."</string>
+     <string name="service_started_by_app" msgid="818675099014723551">"Εκκινήθηκε από εφαρμογή"</string>
++    <!-- no translation found for service_client_name (4037193625611815517) -->
++    <skip />
+     <string name="service_background_processes" msgid="6844156253576174488">"<xliff:g id="MEMORY">%1$s</xliff:g> δωρ."</string>
+     <string name="service_foreground_processes" msgid="7583975676795574276">"<xliff:g id="MEMORY">%1$s</xliff:g> μετ."</string>
+     <string name="memory" msgid="6609961111091483458">"RAM"</string>
++    <!-- no translation found for service_process_name (4098932168654826656) -->
++    <skip />
+     <string name="running_processes_item_description_s_s" msgid="5790575965282023145">"<xliff:g id="NUMPROCESS">%1$d</xliff:g> διεργασία και <xliff:g id="NUMSERVICES">%2$d</xliff:g> υπηρεσία"</string>
+     <string name="running_processes_item_description_s_p" msgid="8019860457123222953">"<xliff:g id="NUMPROCESS">%1$d</xliff:g> διεργασία και <xliff:g id="NUMSERVICES">%2$d</xliff:g> υπηρεσίες"</string>
+     <string name="running_processes_item_description_p_s" msgid="744424668287252915">"<xliff:g id="NUMPROCESS">%1$d</xliff:g> διεργασίες και <xliff:g id="NUMSERVICES">%2$d</xliff:g> υπηρεσία"</string>
+@@ -1157,7 +1163,7 @@
+     <string name="user_dict_settings_context_menu_delete_title" msgid="9140703913776549054">"Διαγραφή"</string>
+     <string name="user_dict_settings_empty_text" msgid="8165273379942105271">"Δεν υπάρχουν λέξεις καταχωρισμένες στο λεξικό χρήστη. Προσθέστε μια λέξη πατώντας το κουμπί Προσθήκη ( + )."</string>
+     <string name="user_dict_settings_all_languages" msgid="6742000040975959247">"Για όλες τις γλώσσες"</string>
+-    <string name="user_dict_settings_more_languages" msgid="7316375944684977910">"Περισσότερες γλώσσες\u2026"</string>
++    <string name="user_dict_settings_more_languages" msgid="7316375944684977910">"Περισσότερες γλώσσες..."</string>
+     <string name="testing" msgid="6584352735303604146">"Δοκιμή"</string>
+     <string name="testing_phone_info" product="tablet" msgid="193561832258534798">"Πληροφορίες tablet"</string>
+     <string name="testing_phone_info" product="default" msgid="8656693364332840056">"Πληροφορίες τηλεφώνου"</string>
+@@ -1265,6 +1271,8 @@
+     <string name="battery_stats_wifi_running_label" msgid="3093545080361658269">"Wi-Fi"</string>
+     <string name="battery_stats_wake_lock_label" msgid="1908942681902324095">"Κανον. λειτ."</string>
+     <string name="battery_stats_phone_signal_label" msgid="4137799310329041341">"Σήμα δικτύου κιν. τηλεφ."</string>
++    <!-- no translation found for battery_stats_last_duration (1535831453827905957) -->
++    <skip />
+     <string name="awake" msgid="387122265874485088">"Χρόνος ενεργοποίησης της συσκευής"</string>
+     <string name="wifi_on_time" msgid="6310209835617490616">"Wi-Fi στην ώρα του"</string>
+     <string name="bluetooth_on_time" msgid="6157799524996162271">"Wi-Fi στην ώρα του"</string>
+@@ -1433,7 +1441,7 @@
+     <string name="sound_category_system_title" msgid="1480844520622721141">"Σύστημα"</string>
+     <string name="wifi_setup_title" msgid="661074868726906436">"Ρύθμιση Wi-Fi"</string>
+     <string name="wifi_setup_title_editing_network" msgid="7304321031985059969">"Σύνδεση στο δίκτυο Wi-Fi <xliff:g id="NETWORK_NAME">%s</xliff:g>"</string>
+-    <string name="wifi_setup_title_connecting_network" msgid="3747859666621319757">"Σύνδεση στο δίκτυο Wi-Fi <xliff:g id="NETWORK_NAME">%s</xliff:g>\u2026"</string>
++    <string name="wifi_setup_title_connecting_network" msgid="3747859666621319757">"Σύνδεση στο δίκτυο Wi-Fi <xliff:g id="NETWORK_NAME">%s</xliff:g>..."</string>
+     <string name="wifi_setup_title_connected_network" msgid="209755856836003839">"Συνδέθηκε στο δίκτυο Wi-Fi <xliff:g id="NETWORK_NAME">%s</xliff:g>"</string>
+     <string name="wifi_setup_title_add_network" msgid="6932651000151032301">"Προσθήκη δικτύου"</string>
+     <string name="wifi_setup_not_connected" msgid="6997432604664057052">"Δεν συνδέθηκε"</string>
+@@ -1447,17 +1455,17 @@
+     <string name="wifi_setup_forget" msgid="2562847595567347526">"Διαγραφή"</string>
+     <string name="wifi_setup_save" msgid="3659235094218508211">"Αποθήκευση"</string>
+     <string name="wifi_setup_cancel" msgid="3185216020264410239">"Ακύρωση"</string>
+-    <string name="wifi_setup_status_scanning" msgid="5317003416385428036">"Σάρωση δικτύων\u2026"</string>
++    <string name="wifi_setup_status_scanning" msgid="5317003416385428036">"Σάρωση δικτύων..."</string>
+     <string name="wifi_setup_status_select_network" msgid="7519563569903137003">"Αγγίξτε ένα δίκτυο για να συνδεθείτε σε αυτό"</string>
+     <string name="wifi_setup_status_existing_network" msgid="6394925174802598186">"Σύνδεση σε υπάρχον δίκτυο"</string>
+     <string name="wifi_setup_status_unsecured_network" msgid="8143046977328718252">"Σύνδεση σε μη ασφαλές δίκτυο"</string>
+     <string name="wifi_setup_status_edit_network" msgid="4765340816724760717">"Πληκτρολογήστε διαμόρφωση δικτύου"</string>
+     <string name="wifi_setup_status_new_network" msgid="7468952850452301083">"Σύνδεση σε νέο δίκτυο"</string>
+-    <string name="wifi_setup_status_connecting" msgid="4971421484401530740">"Γίνεται σύνδεση\u2026"</string>
++    <string name="wifi_setup_status_connecting" msgid="4971421484401530740">"Γίνεται σύνδεση..."</string>
+     <string name="wifi_setup_status_proceed_to_next" msgid="6708250000342940031">"Μετάβαση στο επόμενο βήμα"</string>
+     <string name="wifi_setup_status_eap_not_supported" msgid="5335338851032315905">"Το EAP δεν υποστηρίζεται."</string>
+     <string name="wifi_setup_eap_not_supported" msgid="595556546597351489">"Δεν είναι δυνατή η διαμόρφωση σύνδεσης EAP Wi-Fi κατά τη διάρκεια της εγκατάστασης. Μετά την εγκατάσταση, μπορείτε να τη διαμορφώσετε από το στοιχείο Ρυθμίσεις &gt; Ασύρματο και Δίκτυα."</string>
+-    <string name="wifi_setup_description_connecting" msgid="2793554932006756795">"Η σύνδεση μπορεί να διαρκέσει αρκετά λεπτά\u2026"</string>
++    <string name="wifi_setup_description_connecting" msgid="2793554932006756795">"Η σύνδεση μπορεί να διαρκέσει αρκετά λεπτά..."</string>
+     <string name="wifi_setup_description_connected" msgid="5235991893829582459">"Αγγίξτε το στοιχείο "<b>"Επόμενο"</b>" για να συνεχίσετε την εγκατάσταση."\n\n"Αγγίξτε το στοιχείο "<b>"Πίσω"</b>" για να συνδεθείτε σε διαφορετικό δίκτυο Wi-Fi."</string>
+     <string name="accessibility_sync_enabled" msgid="558480439730263116">"Ενεργοποιημένος συγχρονισμός"</string>
+     <string name="accessibility_sync_disabled" msgid="1741194106479011384">"Συγχρονισμός είναι απενεργοποιημένος"</string>
+@@ -1476,7 +1484,7 @@
+     <string name="sync_disabled" msgid="8511659877596511991">"Ο συγχρονισμός είναι απενεργοποιημένος"</string>
+     <string name="sync_error" msgid="5060969083117872149">"Σφάλμα συγχρονισμού"</string>
+     <string name="last_synced" msgid="4242919465367022234">"Τελευταίος συγχρονισμός <xliff:g id="LAST_SYNC_TIME">%1$s</xliff:g>"</string>
+-    <string name="sync_in_progress" msgid="5151314196536070569">"Συγχρονισμός τώρα\u2026"</string>
++    <string name="sync_in_progress" msgid="5151314196536070569">"Συγχρονισμός τώρα..."</string>
+     <string name="settings_backup" msgid="2274732978260797031">"Δημιουργία αντιγράφων ασφαλείας για τις ρυθμίσεις"</string>
+     <string name="settings_backup_summary" msgid="7916877705938054035">"Δημιουργία αντιγράφων ασφαλείας για τις ρυθμίσεις μου"</string>
+     <string name="sync_menu_sync_now" msgid="6154608350395805683">"Συγχρονισμός τώρα"</string>
+@@ -1500,6 +1508,8 @@
+     <string name="remove_account_failed" product="tablet" msgid="3086620478225952725">"Αυτός ο λογαριασμός απαιτείται από ορισμένες εφαρμογές. Μπορείτε να τον καταργήσετε μόνο μέσω της επαναφοράς των προεπιλεγμένων εργοστασιακών ρυθμίσεων του tablet (με την οποία διαγράφονται όλα τα προσωπικά σας δεδομένα) από το μενού Ρυθμίσεις &gt; Δημιουργία αντιγράφων ασφαλείας και επαναφορά."</string>
+     <string name="remove_account_failed" product="default" msgid="6217238709175617517">"Αυτός ο λογαριασμός απαιτείται από ορισμένες εφαρμογές. Μπορείτε να τον καταργήσετε μόνο μέσω της επαναφοράς των προεπιλεγμένων εργοστασιακών ρυθμίσεων του τηλεφώνου (με την οποία διαγράφονται όλα τα προσωπικά σας δεδομένα) από το μενού Ρυθμίσεις &gt; Δημιουργία αντιγράφων ασφαλείας και επαναφορά."</string>
+     <string name="provider_label" msgid="7724593781904508866">"Προώθηση συνδρομών"</string>
++    <!-- no translation found for sync_item_title (4782834606909853006) -->
++    <skip />
+     <string name="cant_sync_dialog_title" msgid="8923508322291625282">"Δεν είναι δυνατός ο μη αυτόματος συγχρονισμός"</string>
+     <string name="cant_sync_dialog_message" msgid="1938380442159016449">"Ο συγχρονισμός για αυτό το στοιχείο είναι προς το παρόν απενεργοποιημένος. Για να αλλάξετε τη ρύθμισή σας, ενεργοποιήστε προσωρινά τα δεδομένα παρασκηνίου και τον αυτόματο συγχρονισμό."</string>
+     <string name="wimax_settings" msgid="1574837328738396794">"Ρυθμίσεις 4G"</string>
+@@ -1568,7 +1578,7 @@
+     <string name="data_usage_menu_show_ethernet" msgid="5181361208532314097">"Εμφάνιση χρήσης Ethernet"</string>
+     <string name="data_usage_menu_metered" msgid="5056695223222541863">"Σημεία πρόσβασης για κιν."</string>
+     <string name="data_usage_menu_auto_sync" msgid="8203999775948778560">"Αυτόματος συγχρονισμός δεδομένων"</string>
+-    <string name="data_usage_change_cycle" msgid="7776556448920114866">"Αλλαγή κύκλου\u2026"</string>
++    <string name="data_usage_change_cycle" msgid="7776556448920114866">"Αλλαγή κύκλου..."</string>
+     <string name="data_usage_pick_cycle_day" msgid="4470796861757050966">"Η ημέρα που θα γίνει η επαναφορά του κύκλου χρήσης δεδομένων:"</string>
+     <string name="data_usage_empty" msgid="8621855507876539282">"Καμία εφαρμ. δεν χρησιμ. δεδ. αυτήν την περίοδο"</string>
+     <string name="data_usage_label_foreground" msgid="4938034231928628164">"Προσκήνιο"</string>
+@@ -1748,10 +1758,10 @@
+ 
+     <!-- Backlight  -->
+     <string name="backlight_title">Αυτόματο backlight</string>
+-    <string name="backlight_summary">Αλλαγή επιπέδων και φιλτραρίσματος</string>
++    <string name="backlight_summary">Tweak επιπέδων και φιλτραρίσματος</string>
+     <string name="light_filter_title">Φιλτράρισμα αισθητήρα φωτός</string>
+     <string name="light_filter_enabled_title">Ενεργό</string>
+-    <string name="light_filter_enabled_summary">Εφαρμογή μέσου όρου δεδομένων αισθητήρα για την ελαχιστοποίηση του τρεμοπαίγματος</string>
++    <string name="light_filter_enabled_summary">Εφαρμογή φίλτρου δεδομένων μέσου όρου για την ελαχιστοποίηση του flicker</string>
+     <string name="light_filter_window_title">Μέγεθος παραθύρου</string>
+     <string name="light_filter_window_summary">Η φιλτραρ. τιμή είναι ο μέσος όρος που λαμβάνει ο αισθητ. κατά τη διάρκ. αυτής της περιόδου</string>
+     <string name="light_filter_reset_title">Κατώφλι μηδενισμού</string>
+@@ -1759,12 +1769,12 @@
+     <string name="light_filter_interval_title">Χρόνος δείγματος</string>
+     <string name="light_filter_interval_summary">Μία χαμηλή τιμή βελτιώνει την ακρίβεια αλλά χρησιμ. περισ. CPU</string>
+     <string name="light_levels_title">Επίπεδα φωτός</string>
+-    <string name="light_levels_enabled_title">Χρήση προσαρμοσμένων</string>
++    <string name="light_levels_enabled_title">Χρήση προσαρμ.</string>
+     <string name="light_levels_dim_title">Επίπεδο συσκότισης οθόνης</string>
+-    <string name="light_levels_dim_summary">Επίπεδο φωτεινότητας λίγο πριν το κλείσιμο της οθόνης</string>
+-    <string name="light_levels_editor_title">Επεξεργ. άλλων επιπέδων\u2026</string>
++    <string name="light_levels_dim_summary">Επίπεδος φωτεινότητας λίγο πριν το κλείσιμο της οθόνης</string>
++    <string name="light_levels_editor_title">Επεξεργ. άλλων επιπέδων...</string>
+     <string name="light_decrease_enabled_title">Χαμήλωμα φωτεινότητας</string>
+-    <string name="light_decrease_enabled_summary">Να επιτρέπεται το χαμήλωμα της φωτεινότητας. Χρησιμοποιήστε την καθυστέρηση για ελαχιστοποίηση του τρεμοπαίγματος</string>
++    <string name="light_decrease_enabled_summary">Να επιτρέπεται το χαμήλωμα της φωτεινότητας. Χρησιμοποιήστε την καθυστέρηση για ελαχιστοποίηση του flicker</string>
+     <string name="light_decrease_hysteresis_title">Καθυστέρηση μείωσης</string>
+     <string name="light_decrease_hysteresis_summary">Τα επίπεδα των αισθητήρων να καθυστερούν για τόσο κατά τη μείωση</string>
+ 
+@@ -1790,7 +1800,7 @@
+     <string name="notification_light_general_title">Γενικά</string>
+     <string name="notification_light_applist_title">Εφαρμογές</string>
+     <string name="notification_light_phonelist_title">Τηλέφωνο</string>
+-    <string name="notification_light_use_custom">Χρήση προσαρμ. τιμών</string>
++    <string name="notification_light_use_custom">Χρήση προσαρμοσμένων τιμών</string>
+     <string name="notification_light_enabled">Ενεργό</string>
+     <string name="notification_light_disabled">Ανενεργό</string>
+     <string name="notification_light_default_value">Προεπιλογή</string>
+@@ -1801,8 +1811,8 @@
+     <string name="edit_light_settings">Επεξεργασία φωτεινού παλμού</string>
+     <string name="pulse_speed_title">Ταχύτητα και μήκος παλμού</string>
+     <string name="picker_arrow">→</string>
+-    <string name="default_time">Κανονικό</string>
+-    <string name="custom_time">Προσαρμοσμένο</string>
++    <string name="default_time">Κανονικός</string>
++    <string name="custom_time">Προσαρμοσμένος</string>
+     <string name="dialog_test">Δοκιμή</string>
+     <string name="dialog_delete_title">Διαγραφή</string>
+     <string name="dialog_delete_message">Αφαίρεση επιλεγμένου αντικειμένου;</string>
+@@ -1862,7 +1872,7 @@
+     <!-- Hardware keys -->
+     <string name="hardware_keys_title">Πλήκτρα</string>
+     <string name="hardware_keys_bindings_title">Ενέργειες πλήκτρων</string>
+-    <string name="hardware_keys_enable_custom_title">Προσαρμοσμένες ενέργειες</string>
++    <string name="hardware_keys_enable_custom_title">Ενεργοποίηση προσαρμοσμένων ενεργειών</string>
+     <string name="hardware_keys_home_long_press_title">Πλήκτρο Home (παρατεταμένο πάτημα)</string>
+     <string name="hardware_keys_menu_press_title">Πλήκτρο Menu</string>
+     <string name="hardware_keys_menu_long_press_title">Πλήκτρο Menu (παρατεταμένο πάτημα)</string>
+@@ -1899,33 +1909,33 @@
+     <string name="title_toggle_brightness">Φωτεινότητα</string>
+     <string name="title_toggle_sync">Συγχρονισμός</string>
+     <string name="title_toggle_wifiap">Wi-Fi AP</string>
+-    <string name="title_toggle_screentimeout">Χρονικό όριο οθόνης</string>
++    <string name="title_toggle_screentimeout">Χρ. όριο οθόνης</string>
+     <string name="title_toggle_mobiledata">Δεδομένα</string>
+     <string name="title_toggle_lockscreen">Οθόνη κλειδώματος</string>
+     <string name="title_toggle_networkmode">Εναλλαγή 2G/3G</string>
+     <string name="title_toggle_autorotate">Προσανατολισμός</string>
+     <string name="title_toggle_airplane">Λειτουργία πτήσης</string>
+-    <string name="title_toggle_flashlight">Φακός</string>
+-    <string name="title_toggle_sleep">Αναστολή λειτουργίας</string>
+-    <string name="title_toggle_media_play_pause">Μέσα: Αναπαρ./Παύση</string>
++    <string name="title_toggle_flashlight">Φακός LED</string>
++    <string name="title_toggle_sleep">Sleep</string>
++    <string name="title_toggle_media_play_pause">Μέσα: Play/Pause</string>
+     <string name="title_toggle_media_previous">Μέσα: Προηγούμενο</string>
+     <string name="title_toggle_media_next">Μέσα: Επόμενο</string>
+     <string name="title_toggle_lte">LTE</string>
+     <string name="title_toggle_wimax">WiMAX</string>
+     <string name="title_button_modes">ΛΕΙΤΟΥΡΓΙΑ ΠΛΗΚΤΡΩΝ</string>
+     <string name="pref_brightness_mode_title">Φωτεινότητα</string>
+-    <string name="pref_brightness_mode_summary">Επιλέξτε τις εναλλαγές που θα γίνονται με το πλήκτρο φωτεινότητας</string>
+-    <string name="cm_brightness_mode_auto">Αυτόματη</string>
+-    <string name="cm_brightness_mode_dim">Συσκότιση</string>
++    <string name="pref_brightness_mode_summary">Επιλέξτε τις εναλλαγές που θα γίνονται με το πλήκτρο φωτεινότητα</string>
++    <string name="cm_brightness_mode_auto">Auto</string>
++    <string name="cm_brightness_mode_dim">Dim</string>
+     <string name="pref_network_mode_title">Δίκτυο</string>
+     <string name="pref_screentimeout_mode_title">Χρονικό όριο οθόνης</string>
+     <string name="pref_ring_mode_title">Ήχος</string>
+-    <string name="pref_ring_mode_summary">Επιλέξτε τις εναλλαγές που θα γίνονται με το πλήκτρο ήχου</string>
++    <string name="pref_ring_mode_summary">Επιλέξτε τις εναλλαγές που θα γίνονται με το πλήκτρο Ήχος</string>
+     <string name="cm_sound_mode_silent">Σίγαση</string>
+     <string name="cm_sound_mode_vibrate">Δόνηση</string>
+     <string name="cm_sound_mode_sound">Ήχος</string>
+     <string name="cm_sound_mode_soundVibrate">Ήχος+Δόνηση</string>
+-    <string name="pref_flash_mode_title">Φακός</string>
++    <string name="pref_flash_mode_title">Φακός LED</string>
+     <string name="expanded_haptic_feedback_title">Απτική ανάδραση</string>
+ 
+     <!-- Status bar  -->
+@@ -2001,7 +2011,7 @@
+     <string name="calendars_summary">Εμφάνιση συμβάντων απο αυτά τα ημερολόγια</string>
+     <string name="calendar_reminders_only_title">Υπενθύμιση μόνο</string>
+     <string name="calendar_reminders_only_summary">Εμφάνιση μόνο των συμβάντων με υπενθύμιση</string>
+-    <string name="calendar_lookahead_title">Εμφάνιση συμβάντων εως\u2026</string>
++    <string name="calendar_lookahead_title">Εμφάνιση συμβάντων εως...</string>
+     <string name="calendar_show_location_title">Τοποθεσία συμβάντος</string>
+     <string name="calendar_show_description_title">Περιγραφή συμβάντος</string>
+ 
+@@ -2165,7 +2175,7 @@
+     <string name="toggleSound">Κουδούνισμα</string>
+     <string name="toggleBrightness">Φωτεινότητα</string>
+     <string name="toggleAutoRotate">Προσανατολισμός</string>
+-    <string name="toggleScreenTimeout">Χρονικό όριο οθόνης</string>
++    <string name="toggleScreenTimeout">Χρ. όριο οθόνης</string>
+     <string name="toggleAirplane">Λειτουργία πτήσης</string>
+     <string name="toggleFlashlight">Φακός</string>
+     <string name="toggleLockScreen">Οθόνη κλειδώματος</string>
+@@ -2291,8 +2301,8 @@
+ 
+     <!-- Display : Rotation  -->
+     <string name="display_rotation_title">Περιστροφή οθόνης</string>
+-    <string name="display_rotation_enabled">Ενεργοποιημένη</string>
+-    <string name="display_rotation_disabled">Απενεργοποιημένη</string>
++    <string name="display_rotation_enabled">Ενεργοποιημένη.</string>
++    <string name="display_rotation_disabled">Απενεργοποιημένη.</string>
+     <string name="display_rotation_unit">μοίρες</string>
+     <string name="display_lockscreen_rotation_title">Περιστροφή οθ. κλειδώματος</string>
+     <string name="display_rotation_category_title">Επιλογές περιστροφής</string>
+@@ -2356,7 +2366,7 @@
+     <!-- Sound settings screen, the title of the volume bar to adjust the minimum increasing ring volume -->
+     <string name="increasing_ring_min_volume_title">Ένταση έναρξης ήχου κλήσης</string>
+     <string name="increasing_ring_volume_notice">Σημείωση:\nΗ ένταση έναρξης είναι υψηλότερη από την ένταση του κουδουνιού, ο ήχος κλήσης θα παίξει με την ένταση του κουδουνιού.</string>
+-    <string name="increasing_ring_interval_title">Χρονικό διάστημα αύξησης</string>
++    <string name="increasing_ring_interval_title">Χρον. διάστημα αύξησης</string>
+     <string name="increasing_ring_interval_eachring">Σε κάθε χτύπο</string>
+     <string name="increasing_ring_interval_half_second">0.5 δευτερόλεπτα</string>
+     <string name="increasing_ring_interval_1second">1 δευτερόλεπτο</string>
+@@ -2392,7 +2402,7 @@
+     <string name="display_electron_beam_animation_off_title">Εφέ σβησίματος οθόνης</string>
+ 
+     <!-- Sound settings screen -->
+-    <string name="volume_overlay_title">Στυλ πάνελ έντασης</string>
++    <string name="volume_overlay_title">Volume panel style</string>
+     <string name="silent_mode_title">Λειτουργία σίγασης</string>
+     <string name="volbtn_music_controls_title">Έλεγχος μουσικής με τα πλήκτρα ήχου</string>
+     <string name="volbtn_music_controls_summary">Όταν η οθόνη είναι απενεργοποιημένη, πιέζοντας τα πλήκτρα ελέχου έντασης αλλάζετε το τρέχον μουσικό κομμάτι</string>
+@@ -2436,10 +2446,10 @@
+     <string name="ime_switcher_notify_summary">Εμφάνιση ειδοποίησης για τον επιλογέα μεθόδου εισαγωγής</string>
+ 
+     <!-- Change Log strings -->
+-    <string name="changelog_title">Εμφάνιση αρχείου αλλαγών</string>
+-    <string name="changelog_dialog">Αρχείο αλλαγών</string>
+-    <string name="changelog_loading">Φόρτωση αρχείου αλλαγών\u2026</string>
+-    <string name="changelog_error">Δεν είναι δυνατή η φόρτωση του αρχείου αλλαγών</string>
++    <string name="changelog_title">Εμφάνιση changelog</string>
++    <string name="changelog_dialog">Changelog</string>
++    <string name="changelog_loading">Φόρτωση changelog...</string>
++    <string name="changelog_error">Δεν είναι δυνατή η φόρτωση του changelog</string>
+     <string name="changelog_unknown">Άγνωστο</string>
+     <string name="changelog_version">Έκδοση</string>
+ 
+@@ -2450,8 +2460,8 @@
+     <!-- Power menu enable disable -->
+     <string name="power_menu_title">Power menu</string>
+     <string name="power_menu_reboot_title">Επανεκκίνηση</string>
+-    <string name="power_menu_screenshot_title">Στιγμιότυπο οθόνης</string>
+-    <string name="power_menu_expanded_desktop">Επέκταση επιφάνειας</string>
++    <string name="power_menu_screenshot_title">Screenshot</string>
++    <string name="power_menu_expanded_desktop">Expanded desktop</string>
+     <string name="power_menu_profiles_title">Προφίλ</string>
+     <string name="power_menu_airplane_title">Λειτουργία πτήσης</string>
+     <string name="power_menu_silent_title">Πάνελ έντασης</string>
+@@ -2548,5 +2558,5 @@
+     <!-- Bluetooth MAS permission Alert Activity checkbox text [CHAR LIMIT=none] -->
+     <string name="bluetooth_mas_remember_choice">Να μην ερωτηθώ ξανά</string>
+ 
+-    <!-- CYANOGENMOD EDITS END -->
++    <!-- **** CYANOGENMOD ADDITIONS END **** -->
+ </resources>
+diff --git a/res/values-pl/strings.xml b/res/values-pl/strings.xml
+index 505c184..3c0cfd9 100644
+--- a/res/values-pl/strings.xml
++++ b/res/values-pl/strings.xml
+@@ -137,7 +137,7 @@
+     <string name="bluetooth_notif_ticker" msgid="4726721390078512173">"Żądanie parowania Bluetooth"</string>
+     <string name="bluetooth_notif_title" msgid="2485175521845371514">"Żądanie parowania"</string>
+     <string name="bluetooth_notif_message" msgid="5300852675110479862">"Dotknij, by sparować z <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
+-    <string name="bluetooth_show_received_files" msgid="5164787486105868895">"Wyświetl odebrane pliki"</string>
++    <string name="bluetooth_show_received_files" msgid="5164787486105868895">"Pokaż odebrane pliki"</string>
+     <string name="device_picker" msgid="8398232791303186677">"Wybór urządzenia Bluetooth"</string>
+     <string name="bluetooth_permission_request" msgid="1523129741266262748">"Prośba o pozwolenie na włączenie modułu Bluetooth"</string>
+     <string name="bluetooth_ask_enablement" msgid="5279027758886569301">"Aplikacja chce włączyć moduł Bluetooth. Zezwolić?"</string>
+@@ -295,7 +295,7 @@
+     <string name="biometric_weak_liveliness_summary" msgid="4199587000948042325">"Wymagaj mrugnięcia podczas odblokowywania"</string>
+     <string name="lock_after_timeout" msgid="4590337686681194648">"Blokuj automatycznie"</string>
+     <string name="lock_after_timeout_summary" msgid="6128431871360905631">"Po <xliff:g id="TIMEOUT_STRING">%1$s</xliff:g> uśpienia"</string>
+-    <string name="show_owner_info_on_lockscreen_label" msgid="5074906168357568434">"Wyświetl tę informację na ekranie blokady"</string>
++    <string name="show_owner_info_on_lockscreen_label" msgid="5074906168357568434">"Pokaż tę informację na ekranie blokady"</string>
+     <string name="owner_info_settings_title" msgid="2723190010708381889">"Informacje o właścicielu"</string>
+     <string name="owner_info_settings_summary" msgid="3800834657847339570"></string>
+     <string name="owner_info_settings_edit_text_hint" msgid="4608681417960923911">"Wpisz tekst do wyświetlenia na ekranie blokady."</string>
+@@ -557,7 +557,7 @@
+     <string name="wifi_eap_identity" msgid="4359453783379679103">"Tożsamość"</string>
+     <string name="wifi_eap_anonymous" msgid="2989469344116577955">"Tożsamość anonimowa"</string>
+     <string name="wifi_password" msgid="5948219759936151048">"Hasło"</string>
+-    <string name="wifi_show_password" msgid="6461249871236968884">"Wyświetl hasło"</string>
++    <string name="wifi_show_password" msgid="6461249871236968884">"Pokaż hasło"</string>
+     <string name="wifi_ip_settings" msgid="3359331401377059481">"Ustawienia IP"</string>
+     <string name="wifi_unchanged" msgid="3410422020930397102">"(nie zmieniono)"</string>
+     <string name="wifi_unspecified" msgid="5431501214192991253">"(nie określono)"</string>
+@@ -774,7 +774,7 @@
+     <string name="storage_settings" msgid="4211799979832404953">"Pamięć"</string>
+     <string name="storage_settings_title" msgid="8746016738388094064">"Ustawienia pamięci"</string>
+     <string name="storage_settings_summary" product="nosdcard" msgid="3543813623294870759">"Odłącz nośnik USB i wyświetl ilość dostępnej pamięci"</string>
+-    <string name="storage_settings_summary" product="default" msgid="9176693537325988610">"Odłącz kartę SD, Wyświetl ilość dostępnej pamięci w telefonie"</string>
++    <string name="storage_settings_summary" product="default" msgid="9176693537325988610">"Odłącz kartę SD, pokaż ilość dostępnej pamięci w telefonie"</string>
+ 
+ 
+     <string name="status_number" product="tablet" msgid="1138837891091222272">"MDN"</string>
+@@ -1017,8 +1017,8 @@
+     <string name="lockpattern_settings_enable_title" msgid="6920616873671115281">"Wymagaj wzoru"</string>
+     <string name="lockpattern_settings_enable_summary" msgid="1165707416664252167">"Trzeba narysować wzór, aby odblokować ekran"</string>
+     <string name="lockpattern_settings_enable_visible_pattern_title" msgid="2615606088906120711">"Wzór jest widoczny"</string>
+-    <string name="lockpattern_settings_enable_error_path_title">Wyświetl ślad błędu</string>
+-    <string name="lockpattern_settings_enable_dots_title">Wyświetl punkty wzoru</string>
++    <string name="lockpattern_settings_enable_error_path_title">Pokaż ślad błędu</string>
++    <string name="lockpattern_settings_enable_dots_title">Pokaż punkty wzoru</string>
+     <string name="lockpattern_settings_enable_tactile_feedback_title" msgid="8898518337442601027">"Wibracje przy dotknięciu"</string>
+     <string name="lockpattern_settings_enable_power_button_instantly_locks" msgid="5735444062633666327">"Blokada przyciskiem zasilania"</string>
+     <string name="lockpattern_settings_choose_lock_pattern" msgid="1652352830005653447">"Ustaw wzór odblokowania"</string>
+@@ -1075,8 +1075,8 @@
+     <string name="unknown" msgid="1592123443519355854">"Nieznana"</string>
+     <string name="sort_order_alpha" msgid="1410278099123670628">"Sortuj według nazwy"</string>
+     <string name="sort_order_size" msgid="7024513286636502362">"Sortuj według rozmiaru"</string>
+-    <string name="show_running_services" msgid="5736278767975544570">"Wyświetl działające usługi"</string>
+-    <string name="show_background_processes" msgid="2009840211972293429">"Wyświetl procesy z pamięci podręcznej"</string>
++    <string name="show_running_services" msgid="5736278767975544570">"Pokaż działające usługi"</string>
++    <string name="show_background_processes" msgid="2009840211972293429">"Pokaż procesy z pamięci podręcznej"</string>
+     <string name="reset_app_preferences" msgid="1321050641018356925">"Resetuj opcje aplikacji"</string>
+     <string name="reset_app_preferences_title" msgid="6093179367325336662">"Zresetować opcje aplikacji?"</string>
+     <string name="reset_app_preferences_desc" msgid="1118129530999596317">"Wszystkie te ustawienia zostaną zresetowane:"\n\n" "<li>"wyłączone aplikacje,"</li>\n" "<li>"wyłączone powiadomienia aplikacji,"</li>\n" "<li>"aplikacje używane domyślnie do wykonania czynności,"</li>\n" "<li>"ograniczenia użycia danych w tle w aplikacjach."</li>\n\n" Nie utracisz żadnych danych aplikacji."</string>
+@@ -1606,11 +1606,11 @@
+     <string name="strict_mode_summary" msgid="142834318897332338">"Miganie ekranu podczas długich operacji w wątku głównym"</string>
+     <string name="pointer_location" msgid="6084434787496938001">"Lokalizacja wskaźnika"</string>
+     <string name="pointer_location_summary" msgid="840819275172753713">"Nakładka na ekranie pokazująca dane o dotyku"</string>
+-    <string name="show_touches" msgid="1356420386500834339">"Wyświetl dotknięcia"</string>
++    <string name="show_touches" msgid="1356420386500834339">"Pokaż dotknięcia"</string>
+     <string name="show_touches_summary" msgid="6684407913145150041">"Potwierdzenia wizualne po dotknięciu"</string>
+-    <string name="show_screen_updates" msgid="5470814345876056420">"Wyświetl zmiany powierzchni"</string>
++    <string name="show_screen_updates" msgid="5470814345876056420">"Pokaż zmiany powierzchni"</string>
+     <string name="show_screen_updates_summary" msgid="2569622766672785529">"Podświetlaj całe aktualizowane powierzchnie okien"</string>
+-    <string name="show_hw_screen_updates" msgid="5036904558145941590">"Wyświetl zmiany widoku z GPU"</string>
++    <string name="show_hw_screen_updates" msgid="5036904558145941590">"Pokaż zmiany widoku z GPU"</string>
+     <string name="show_hw_screen_updates_summary" msgid="1115593565980196197">"Podświetlaj widoki w oknach rysowane przez GPU"</string>
+     <string name="disable_overlays" msgid="2074488440505934665">"Wyłącz nakładki HW"</string>
+     <string name="disable_overlays_summary" msgid="3578941133710758592">"Zawsze używaj GPU do komponowania ekranu"</string>
+@@ -1619,9 +1619,9 @@
+     <string name="enable_traces_summary_none" msgid="1867562808503494163">"Brak włączonych śladów"</string>
+     <string name="enable_traces_summary_num" msgid="8978230237777454269">"Włączone ślady: <xliff:g id="NUM">%1$d</xliff:g>"</string>
+     <string name="enable_traces_summary_all" msgid="3950139649125158247">"Wszystkie ślady są włączone"</string>
+-    <string name="debug_layout" msgid="5981361776594526155">"Wyświetl granice układu"</string>
+-    <string name="debug_layout_summary" msgid="2001775315258637682">"Wyświetl granice przycięcia, marginesy itd."</string>
+-    <string name="show_cpu_usage" msgid="2389212910758076024">"Wyświetl użycie procesora"</string>
++    <string name="debug_layout" msgid="5981361776594526155">"Pokaż granice układu"</string>
++    <string name="debug_layout_summary" msgid="2001775315258637682">"Pokaż granice przycięcia, marginesy itd."</string>
++    <string name="show_cpu_usage" msgid="2389212910758076024">"Pokaż użycie procesora"</string>
+     <string name="show_cpu_usage_summary" msgid="2113341923988958266">"Nakładka na ekranie pokazująca użycie procesora"</string>
+     <string name="force_hw_ui" msgid="6426383462520888732">"Renderowanie na GPU"</string>
+     <string name="force_hw_ui_summary" msgid="5535991166074861515">"Wymuszaj użycie GPU do rysowania 2D"</string>
+@@ -1634,15 +1634,15 @@
+     <string name="immediately_destroy_activities" msgid="8366775083630234121">"Nie zachowuj działań"</string>
+     <string name="immediately_destroy_activities_summary" msgid="3592221124808773368">"Przerwij każde działanie, gdy użytkownik je porzuci"</string>
+     <string name="app_process_limit_title" msgid="4280600650253107163">"Limit procesów w tle"</string>
+-    <string name="show_all_anrs" msgid="28462979638729082">"Wyświetl wszystkie ANR"</string>
+-    <string name="show_all_anrs_summary" msgid="641908614413544127">"Wyświetl okno Aplikacja Nie Reaguje dla aplikacji w tle"</string>
++    <string name="show_all_anrs" msgid="28462979638729082">"Pokaż wszystkie ANR"</string>
++    <string name="show_all_anrs_summary" msgid="641908614413544127">"Pokaż okno Aplikacja Nie Reaguje dla aplikacji w tle"</string>
+     <string name="data_usage_summary_title" msgid="3804110657238092929">"Użycie danych"</string>
+     <string name="data_usage_cycle" msgid="5652529796195787949">"Cykl transmisji danych"</string>
+     <string name="data_usage_menu_roaming" msgid="8042359966835203296">"Dane w roamingu"</string>
+     <string name="data_usage_menu_restrict_background" msgid="1989394568592253331">"Ogranicz przesył danych w tle"</string>
+     <string name="data_usage_menu_split_4g" msgid="5322857680792601899">"Oddzielnie transmisja danych 4G"</string>
+-    <string name="data_usage_menu_show_wifi" msgid="8266875319417201085">"Wyświetl użycie Wi-Fi"</string>
+-    <string name="data_usage_menu_show_ethernet" msgid="5181361208532314097">"Wyświetl użycie sieci Ethernet"</string>
++    <string name="data_usage_menu_show_wifi" msgid="8266875319417201085">"Pokaż użycie Wi-Fi"</string>
++    <string name="data_usage_menu_show_ethernet" msgid="5181361208532314097">"Pokaż użycie sieci Ethernet"</string>
+     <string name="data_usage_menu_metered" msgid="5056695223222541863">"Hotspoty komórkowe"</string>
+     <string name="data_usage_menu_auto_sync" msgid="8203999775948778560">"Autosynchronizacja danych"</string>
+     <string name="data_usage_change_cycle" msgid="7776556448920114866">"Zmień cykl"</string>
+@@ -1765,7 +1765,7 @@
+     <string name="user_new_user_name" msgid="7603010274765911161">"Nieznośny dzieciak"</string>
+     <string name="user_confirm_remove_title" msgid="3856148232937245711">"Usunąć użytkownika?"</string>
+     <string name="user_confirm_remove_message" msgid="5284111415714437285">"Czy na pewno chcesz usunąć użytkownika i wszystkie związane z nim dane z urządzenia?"</string>
+-    <string name="app_notifications_switch_label" msgid="9124072219553687583">"Wyświetl powiadomienia"</string>
++    <string name="app_notifications_switch_label" msgid="9124072219553687583">"Pokaż powiadomienia"</string>
+     <string name="help_label" msgid="1107174367904110532">"Pomoc"</string>
+     <string name="cell_broadcast_settings" msgid="8415582011920085222">"Transmisje komórkowe"</string>
+     <string name="cell_broadcast_settings_summary" msgid="3301339398950905913">"Wybierz typy alertów o zagrożeniu, które chcesz wyświetlić."</string>
+@@ -1845,7 +1845,7 @@
+     <string name="ll_save">Zastosuj</string>
+     <string name="ll_reload">Przeładuj</string>
+     <string name="ll_bad_levels">Poziomy muszą się zwiększać</string>
+-    <string name="ll_num_levels">Liczba poziomów</string>
++    <string name="ll_num_levels">Ilość poziomów</string>
+     <string name="notification_pulse_title" msgid="1247988024534030629">"Pulsująca dioda"</string>
+     <string name="notification_light_general_title">Ogólne</string>
+     <string name="notification_light_applist_title">Aplikacje</string>
+@@ -1904,7 +1904,7 @@
+     <string name="hardware_keys_assist_long_press_title">Przycisk „Szukaj” (przytrzymać)</string>
+     <string name="hardware_keys_app_switch_press_title">Przycisk przełączania aplikacji</string>
+     <string name="hardware_keys_app_switch_long_press_title">Przycisk przełączania aplikacji(przytrzymać)</string>
+-    <string name="hardware_keys_show_overflow_title">Wyświetl nadmiar akcji</string>
++    <string name="hardware_keys_show_overflow_title">Pokaż nadmiar akcji</string>
+     <string name="hardware_keys_show_overflow_summary">Wyświetl 3-kropkowy przycisk nadmiarowego menu</string>
+     <string name="hardware_keys_show_overflow_toast_enable">Nadmiar akcji może nie być widoczny dopóki aplikacje nie zostaną zrestartowane</string>
+     <string name="hardware_keys_show_overflow_toast_disable">Nadmiar akcji może nie zniknąć dopóki aplikacje nie zostaną zrestartowane</string>
+@@ -1915,7 +1915,7 @@
+     <string name="hardware_keys_action_voice_search">Wyszukiwanie głosowe</string>
+     <string name="hardware_keys_action_in_app_search">Własna wyszukiwarka aplikacji</string>
+     <string name="power_widget_title">Widżet zasilania</string>
+-    <string name="title_expanded_widget">Wyświetl widżet</string>
++    <string name="title_expanded_widget">Pokaż widżet</string>
+     <string name="power_widget_behavior">Zachowanie widżetu</string>
+     <string name="title_expanded_hide_onchange">Ukryj po zmianie</string>
+     <string name="title_expanded_hide_scrollbar">Ukryj pasek przewijania</string>
+@@ -1963,7 +1963,7 @@
+     <string name="status_bar_title">Pasek stanu</string>
+     <string name="status_bar_clock_title">Zegar</string>
+     <string name="status_bar_general_title">Ogólne</string>
+-    <string name="status_bar_show_clock_title">Wyświetl zegar</string>
++    <string name="status_bar_show_clock_title">Pokaż zegar</string>
+     <string name="status_bar_am_pm_title">Wyświetlanie AM/PM</string>
+     <string name="status_bar_am_pm_info">24-godzinny zegar jest aktywny</string>
+     <string name="status_bar_battery_title">Wyświetlanie stanu baterii</string>
+@@ -1986,17 +1986,17 @@
+     <string name="lockscreen_target_edit_title">Edytuj skrót</string>
+     <string name="lockscreen_target_edit_msg">Wybierz lub zmień aplikację, aktywność oraz ikonę</string>
+     <string name="lockscreen_weather_title">Pogoda</string>
+-    <string name="lockscreen_weather_summary">Wyświetl informacje o pogodzie na ekranie blokady</string>
++    <string name="lockscreen_weather_summary">Pokaż informacje o pogodzie na ekranie blokady</string>
+     <string name="lockscreen_weather_enabled">Włączone</string>
+-    <string name="weather_enable">Wyświetl pogodę</string>
++    <string name="weather_enable">Pokaż pogodę</string>
+     <string name="weather_source">Yahoo! Weather</string>
+     <string name="weather_use_custom_location">Użyj niestandardowej lokalizacji</string>
+     <string name="weather_geolocated">Geolokacja przez sieć</string>
+     <string name="weather_custom_location_dialog_title">Podaj lokalizację</string>
+     <string name="weather_custom_location_hint">Miasto, Stan/Państwo</string>
+     <string name="weather_custom_location_title">Lokalizacja</string>
+-    <string name="weather_show_location_title">Wyświetl lokalizację</string>
+-    <string name="weather_show_timestamp_title">Wyświetl datę</string>
++    <string name="weather_show_location_title">Pokaż lokalizację</string>
++    <string name="weather_show_timestamp_title">Pokaż datę</string>
+     <string name="weather_refresh_interval">Częstotliwość aktualizacji</string>
+     <string name="weather_use_metric">Używaj jednostek metrycznych</string>
+     <string name="weather_retrieve_location_dialog_title">Nie można odnaleźć lokalizacji!</string>
+@@ -2012,13 +2012,13 @@
+     <string name="weather_refresh_6hrs">6 godzin</string>
+     <string name="weather_refresh_8hrs">8 godzin</string>
+     <string name="lockscreen_calendar_title">Kalendarz</string>
+-    <string name="lockscreen_calendar_summary">Wyświetl najbliższe wydarzenie na ekranie blokady</string>
++    <string name="lockscreen_calendar_summary">Pokaż najbliższe wydarzenie na ekranie blokady</string>
+     <string name="lockscreen_calendar_enabled">Włączone</string>
+-    <string name="calendar_title">Wyświetl najbliższe wydarzenie</string>
++    <string name="calendar_title">Pokaż najbliższe wydarzenie</string>
+     <string name="calendars_title">Wybierz kalendarze</string>
+     <string name="calendars_summary">Wyświetlane będą wydarzenia z wybranych kalendarzy</string>
+     <string name="calendar_reminders_only_title">Tylko przypomnienia</string>
+-    <string name="calendar_reminders_only_summary">Wyświetl tylko wydarzenia z przypomnieniem</string>
++    <string name="calendar_reminders_only_summary">Pokaż tylko wydarzenia z przypomnieniem</string>
+     <string name="calendar_lookahead_title">Zakres czasu</string>
+     <string name="calendar_show_location_title">Lokalizacja wydarzenia</string>
+     <string name="calendar_show_description_title">Opis wydarzenia</string>
+@@ -2029,8 +2029,8 @@
+     <string name="calendar_lookahead_3days">3 dni</string>
+     <string name="calendar_lookahead_1wk">1 tydzień</string>
+     <string name="calendar_metadata_none">Nie pokazuj</string>
+-    <string name="calendar_metadata_first_line">Wyświetl pierwszą linię</string>
+-    <string name="calendar_metadata_all">Wyświetl wszystko</string>
++    <string name="calendar_metadata_first_line">Pokaż pierwszą linię</string>
++    <string name="calendar_metadata_all">Pokaż wszystko</string>
+     <string name="lockscreen_custom_background_title">Tło</string>
+     <string name="lockscreen_custom_background_dialog_title">Wybierz kolor</string>
+     <string name="lockscreen_background_result_successful">Tło zmienione</string>
+@@ -2207,7 +2207,7 @@
+     <string name="anonymous_statistics_title">Statystyki CyanogenMod</string>
+     <string name="anonymous_statistics_summary">Pomóż sprawić, by CyanogenMod stał się lepszy, wysyłając anonimowe statystyki</string>
+     <string name="anonymous_statistics_warning_title">O statystykach</string>
+-    <string name="anonymous_statistics_warning">Zezwolenie na anonimowe satystyki pozwala śledzić twórcom CyanogenMod liczbę jego instalacji.
++    <string name="anonymous_statistics_warning">Zezwolenie na anonimowe satystyki pozwala śledzić twórcom CyanogenMod ilość jego instalacji.
+         Przesyłane informacje zawierają unikatowy identyfikator urządzenia,
+         co nie narusza twojej prywatności ani danych. Informacje są przesyłane podczas każdego uruchamiania systemu.\n\nMożesz sprawdzić, jakie informacje są przysałne, używając opcji Podgląd danych.</string>
+     <string name="enable_reporting_title">Włącz raportowanie</string>
+@@ -2277,8 +2277,8 @@
+     <string name="dhcp_lease_12h">12 godzin</string>
+     <string name="dhcp_lease_24h">24 godziny</string>
+ 
+-    <string name="status_bar_notif_count_title">Wyświetl liczbę powiadomień</string>
+-    <string name="status_bar_notif_count_summary">Wyświetl liczbę oczekujących powiadomień na pasku stanu</string>
++    <string name="status_bar_notif_count_title">Pokaż ilość powiadomień</string>
++    <string name="status_bar_notif_count_summary">Pokaż ilość oczekujących powiadomień na pasku stanu</string>
+ 
+     <string name="increasing_ring_title">Narastający dzwonek</string>
+     <string name="checkbox_increasing_ring">Włącz</string>
+@@ -2310,7 +2310,7 @@
+     <string name="adb_over_network_summary">Połączenie ADB przez wszystkie interfejsy sieciowe. Wyłączane podczas restartu urządzenia</string>
+     <string name="adb_over_network_warning">UWAGA: Kiedy debugowanie przez sieć jest włączone, twój telefon jest otwarty na ataki przez wszystkie sieci, z którymi jesteś połączony, włączając w to także sieć komórkową!\n\nUżywaj tylko w zaufanych sieciach.\n\nNapewno chcesz włączyć tę funkcję?</string>
+ 
+-    <string name="lockpattern_settings_enable_lock_before_unlock">Wyświetl widżety przed odblokowaniem</string>
++    <string name="lockpattern_settings_enable_lock_before_unlock">Pokaż widżety przed odblokowaniem</string>
+ 
+     <string name="display_category_animation_options_title">Animacja</string>
+     <string name="display_electron_beam_animation_on_title">Animacja włączania ekranu</string>
+@@ -2344,17 +2344,17 @@
+     <string name="mem_info">Pamięć RAM</string>
+ 
+     <string name="ime_switcher_notify">Powiadomienie wyboru</string>
+-    <string name="ime_switcher_notify_summary">Wyświetl powiadomienie o wyborze metody wprowadzania</string>
++    <string name="ime_switcher_notify_summary">Pokaż powiadomienie o wyborze metody wprowadzania</string>
+ 
+-    <string name="changelog_title">Wyświetl dziennik zmian</string>
++    <string name="changelog_title">Pokaż dziennik zmian</string>
+     <string name="changelog_dialog">Dziennik zmian</string>
+     <string name="changelog_loading">Wczytywanie dziennika...</string>
+     <string name="changelog_error">Nie można wczytać dziennika zmian</string>
+     <string name="changelog_unknown">Nieznany</string>
+     <string name="changelog_version">Wersja</string>
+ 
+-    <string name="stylus_icon_enabled_title">Wyświetl użycie rysika</string>
+-    <string name="stylus_icon_enabled_summary">Wyświetl ikonę wskaźnika w trakcie korzystania z rysika</string>
++    <string name="stylus_icon_enabled_title">Pokaż użycie rysika</string>
++    <string name="stylus_icon_enabled_summary">Pokaż ikonę wskaźnika w trakcie korzystania z rysika</string>
+ 
+     <string name="power_menu_title">Menu przycisku „Power”</string>
+     <string name="power_menu_reboot_title">Menu restartu</string>
+diff --git a/res/values-pt/arrays.xml b/res/values-pt/arrays.xml
+index 8a309df..18f7adf 100755
+--- a/res/values-pt/arrays.xml
++++ b/res/values-pt/arrays.xml
+@@ -246,7 +246,7 @@
+   </string-array>
+   <string-array name="animator_duration_scale_entries">
+     <item msgid="6039901060648228241">"Animação desativada"</item>
+-    <item msgid="1138649021950863198">"Escala de animação 0,5x"</item>
++    <item msgid="1138649021950863198">"Escala de animação 5x"</item>
+     <item msgid="4394388961370833040">"Escala de animação 1x"</item>
+     <item msgid="8125427921655194973">"Escala de animação 1.5 x"</item>
+     <item msgid="3334024790739189573">"Escala de animação 2x"</item>
+diff --git a/src/com/android/settings/cmstats/AnonymousStats.java b/src/com/android/settings/cmstats/AnonymousStats.java
+index 97353b8..460e545 100644
+--- a/src/com/android/settings/cmstats/AnonymousStats.java
++++ b/src/com/android/settings/cmstats/AnonymousStats.java
+@@ -40,6 +40,8 @@ public class AnonymousStats extends SettingsPreferenceFragment
+ 
+     protected static final String ANONYMOUS_OPT_IN = "pref_anonymous_opt_in";
+ 
++    protected static final String ANONYMOUS_FIRST_BOOT = "pref_anonymous_first_boot";
++
+     protected static final String ANONYMOUS_LAST_CHECKED = "pref_anonymous_checked_in";
+ 
+     protected static final String ANONYMOUS_ALARM_SET = "pref_anonymous_alarm_set";
+@@ -63,6 +65,13 @@ public class AnonymousStats extends SettingsPreferenceFragment
+             mPrefs = getActivity().getSharedPreferences("CMStats", 0);
+             mEnableReporting = (CheckBoxPreference) prefSet.findPreference(ANONYMOUS_OPT_IN);
+             mViewStats = (Preference) prefSet.findPreference(VIEW_STATS);
++            boolean firstBoot = mPrefs.getBoolean(ANONYMOUS_FIRST_BOOT, true);
++            if (mEnableReporting.isChecked() && firstBoot) {
++                mPrefs.edit().putBoolean(ANONYMOUS_FIRST_BOOT, false).apply();
++                ReportingServiceManager.launchService(getActivity());
++            }
++            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
++            nm.cancel(1);
+         }
+     }
+ 
+diff --git a/src/com/android/settings/cmstats/ReportingService.java b/src/com/android/settings/cmstats/ReportingService.java
+index b8b54d2..2a034e3 100644
+--- a/src/com/android/settings/cmstats/ReportingService.java
++++ b/src/com/android/settings/cmstats/ReportingService.java
+@@ -39,11 +39,6 @@ import android.util.Log;
+ import com.android.settings.R;
+ import com.android.settings.Settings;
+ 
+-import com.google.analytics.tracking.android.GoogleAnalytics;
+-import com.google.analytics.tracking.android.Tracker;
+-
+-import com.android.settings.R;
+-
+ public class ReportingService extends Service {
+     protected static final String TAG = "CMStats";
+ 
+@@ -54,14 +49,19 @@ public class ReportingService extends Service {
+ 
+     @Override
+     public int onStartCommand (Intent intent, int flags, int startId) {
+-        Log.d(TAG, "User has opted in -- reporting.");
+-        Thread thread = new Thread() {
+-            @Override
+-            public void run() {
+-                report();
+-            }
+-        };
+-        thread.start();
++        if (intent.getBooleanExtra("firstBoot", false)) {
++            promptUser();
++            Log.d(TAG, "Prompting user for opt-in.");
++        } else {
++            Log.d(TAG, "User has opted in -- reporting.");
++            Thread thread = new Thread() {
++                @Override
++                public void run() {
++                    report();
++                }
++            };
++            thread.start();
++        }
+         return Service.START_REDELIVER_INTENT;
+     }
+ 
+@@ -80,26 +80,6 @@ public class ReportingService extends Service {
+         Log.d(TAG, "SERVICE: Carrier=" + deviceCarrier);
+         Log.d(TAG, "SERVICE: Carrier ID=" + deviceCarrierId);
+ 
+-        // report to google analytics
+-        GoogleAnalytics ga = GoogleAnalytics.getInstance(this);
+-        Tracker tracker = ga.getTracker(getString(R.string.ga_trackingId));
+-        tracker.sendEvent(deviceName, deviceVersion, deviceCountry, null);
+-        // this really should be set at build time...
+-        // format of version should be:
+-        // version[-date-type]-device
+-        String[] parts = deviceVersion.split("-");
+-        String deviceVersionNoDevice = null;
+-        if (parts.length == 2) {
+-            deviceVersionNoDevice = parts[0];
+-        }
+-        else if (parts.length == 4) {
+-            deviceVersionNoDevice = parts[0] + "-" + parts[2];
+-        }
+-        if (deviceVersionNoDevice != null)
+-            tracker.sendEvent("checkin", deviceName, deviceVersionNoDevice, null);
+-        tracker.close();
+-
+-        // report to the cmstats service
+         HttpClient httpclient = new DefaultHttpClient();
+         HttpPost httppost = new HttpPost("http://stats.cyanogenmod.org/submit");
+         try {
+@@ -120,4 +100,20 @@ public class ReportingService extends Service {
+         ReportingServiceManager.setAlarm(this);
+         stopSelf();
+     }
++
++    private void promptUser() {
++        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
++        Intent nI = new Intent();
++        nI.setComponent(new ComponentName(getPackageName(),Settings.AnonymousStatsActivity.class.getName()));
++        PendingIntent pI = PendingIntent.getActivity(this, 0, nI, 0);
++        Notification.Builder builder = new Notification.Builder(this)
++        .setSmallIcon(R.drawable.ic_cm_stats_notif)
++        .setAutoCancel(true)
++        .setTicker(getString(R.string.anonymous_statistics_title))
++        .setContentIntent(pI)
++        .setWhen(0)
++        .setContentTitle(getString(R.string.anonymous_statistics_title))
++        .setContentText(getString(R.string.anonymous_notification_desc));
++        nm.notify(1, builder.getNotification());
++    }
+ }
+diff --git a/src/com/android/settings/cmstats/ReportingServiceManager.java b/src/com/android/settings/cmstats/ReportingServiceManager.java
+index 3a065ff..41f563d 100644
+--- a/src/com/android/settings/cmstats/ReportingServiceManager.java
++++ b/src/com/android/settings/cmstats/ReportingServiceManager.java
+@@ -29,8 +29,8 @@ import android.util.Log;
+ 
+ public class ReportingServiceManager extends BroadcastReceiver {
+ 
+-    public static final long dMill = 24L * 60L * 60L * 1000L;
+-    public static final long tFrame = 1L * dMill;
++    public static final long dMill = 24 * 60 * 60 * 1000;
++    public static final long tFrame = 7 * dMill;
+ 
+     @Override
+     public void onReceive(Context ctx, Intent intent) {
+@@ -45,15 +45,13 @@ public class ReportingServiceManager extends BroadcastReceiver {
+         SharedPreferences prefs = ctx.getSharedPreferences("CMStats", 0);
+         prefs.edit().putBoolean(AnonymousStats.ANONYMOUS_ALARM_SET, false).apply();
+         boolean optedIn = prefs.getBoolean(AnonymousStats.ANONYMOUS_OPT_IN, true);
+-        if (!optedIn) {
++        boolean firstBoot = prefs.getBoolean(AnonymousStats.ANONYMOUS_FIRST_BOOT, true);
++        if (!optedIn || firstBoot) {
+             return;
+         }
+         long lastSynced = prefs.getLong(AnonymousStats.ANONYMOUS_LAST_CHECKED, 0);
+         if (lastSynced == 0) {
+-            // never synced, so let's fake out that the last sync was just now.
+-            // this will allow the user tFrame time to opt out before it will start
+-            // sending up anonymous stats.
+-            lastSynced = System.currentTimeMillis();
++            return;
+         }
+         long timeLeft = (lastSynced + tFrame) - System.currentTimeMillis();
+         Intent sIntent = new Intent(ConnectivityManager.CONNECTIVITY_ACTION);
+@@ -70,6 +68,7 @@ public class ReportingServiceManager extends BroadcastReceiver {
+         if (networkInfo != null && networkInfo.isConnected()) {
+             SharedPreferences prefs = ctx.getSharedPreferences("CMStats", 0);
+             long lastSynced = prefs.getLong(AnonymousStats.ANONYMOUS_LAST_CHECKED, 0);
++            boolean firstBoot = prefs.getBoolean(AnonymousStats.ANONYMOUS_FIRST_BOOT, true);
+             boolean optedIn = prefs.getBoolean(AnonymousStats.ANONYMOUS_OPT_IN, true);
+             boolean alarmSet = prefs.getBoolean(AnonymousStats.ANONYMOUS_ALARM_SET, false);
+             if (alarmSet) {
+@@ -81,9 +80,10 @@ public class ReportingServiceManager extends BroadcastReceiver {
+             } else if (System.currentTimeMillis() - lastSynced >= tFrame) {
+                 shouldSync = true;
+             }
+-            if (shouldSync && optedIn) {
++            if ((shouldSync && optedIn) || firstBoot) {
+                 Intent sIntent = new Intent();
+                 sIntent.setComponent(new ComponentName(ctx.getPackageName(), ReportingService.class.getName()));
++                sIntent.putExtra("firstBoot", firstBoot);
+                 ctx.startService(sIntent);
+             } else if (optedIn) {
+                 setAlarm(ctx);
+diff --git a/src/com/android/settings/cmstats/Utilities.java b/src/com/android/settings/cmstats/Utilities.java
+index 4548ded..5e598db 100644
+--- a/src/com/android/settings/cmstats/Utilities.java
++++ b/src/com/android/settings/cmstats/Utilities.java
+@@ -22,12 +22,26 @@ import java.security.MessageDigest;
+ 
+ import android.content.Context;
+ import android.os.SystemProperties;
+-import android.provider.Settings;
+ import android.telephony.TelephonyManager;
+ 
+ public class Utilities {
+     public static String getUniqueID(Context ctx) {
+-        return digest(ctx.getPackageName() + Settings.Secure.getString(ctx.getContentResolver(), Settings.Secure.ANDROID_ID));
++        TelephonyManager tm = (TelephonyManager) ctx
++                .getSystemService(Context.TELEPHONY_SERVICE);
++
++        String device_id = digest(tm.getDeviceId());
++        if (device_id == null) {
++            String wifiInterface = SystemProperties.get("wifi.interface");
++            try {
++                String wifiMac = new String(NetworkInterface.getByName(
++                        wifiInterface).getHardwareAddress());
++                device_id = digest(wifiMac);
++            } catch (Exception e) {
++                device_id = null;
++            }
++        }
++
++        return device_id;
+     }
+ 
+     public static String getCarrier(Context ctx) {
+diff --git a/src/com/android/settings/widget/ChartGridView.java b/src/com/android/settings/widget/ChartGridView.java
+index f358ada..dce180d 100644
+--- a/src/com/android/settings/widget/ChartGridView.java
++++ b/src/com/android/settings/widget/ChartGridView.java
+@@ -46,7 +46,7 @@ public class ChartGridView extends View {
+ 
+     private Drawable mPrimary;
+     private Drawable mSecondary;
+-    private Drawable mBorder;
++    //private Drawable mBorder;
+     private int mLabelColor;
+ 
+     private Layout mLayoutStart;
+@@ -70,7 +70,7 @@ public class ChartGridView extends View {
+ 
+         mPrimary = a.getDrawable(R.styleable.ChartGridView_primaryDrawable);
+         mSecondary = a.getDrawable(R.styleable.ChartGridView_secondaryDrawable);
+-        mBorder = a.getDrawable(R.styleable.ChartGridView_borderDrawable);
++        //mBorder = a.getDrawable(R.styleable.ChartGridView_borderDrawable);
+         mLabelColor = a.getColor(R.styleable.ChartGridView_labelColor, Color.RED);
+ 
+         a.recycle();
+@@ -114,8 +114,8 @@ public class ChartGridView extends View {
+             primary.draw(canvas);
+         }
+ 
+-        mBorder.setBounds(0, 0, width, height);
+-        mBorder.draw(canvas);
++        //mBorder.setBounds(0, 0, width, height);
++        //mBorder.draw(canvas);
+ 
+         final int padding = mLayoutStart != null ? mLayoutStart.getHeight() / 8 : 0;
+ 
+-- 
+2.1.2
