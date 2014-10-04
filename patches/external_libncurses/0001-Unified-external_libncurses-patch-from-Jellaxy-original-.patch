@@ -1,0 +1,26 @@
+From 926745c58b9d43814160994aa96233304fef93d3 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Sat, 4 Oct 2014 15:45:22 +0200
+Subject: [PATCH] Unified external_libncurses patch from Jellaxy original branch
+
+---
+ Android.mk | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/Android.mk b/Android.mk
+index cf3beea..5adef89 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -32,10 +32,3 @@ LOCAL_MODULE := libncurses
+ 
+ include $(BUILD_SHARED_LIBRARY)
+ 
+-TERMINFO_SOURCE := $(LOCAL_PATH)/lib/terminfo/
+-TERMINFO_TARGET := $(TARGET_OUT_ETC)/terminfo
+-$(TERMINFO_TARGET):
+-		@echo "copy terminfo to /etc/" 
+-		@mkdir -p $@
+-		@cp -r $(TERMINFO_SOURCE)/* $@
+-ALL_DEFAULT_INSTALLED_MODULES += $(TERMINFO_TARGET)
+-- 
+2.1.2
