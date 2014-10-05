@@ -17,6 +17,7 @@ $(call inherit-product, vendor/samsung/gio/vendor_blobs.mk)
 
 # Using our vendor (Superuser, hosts file and APNS)
 $(call inherit-product, vendor/mmb/vendor_blobs.mk)
+
 # Including GApps
 $(call inherit-product, vendor/google/tiny.mk)
 
