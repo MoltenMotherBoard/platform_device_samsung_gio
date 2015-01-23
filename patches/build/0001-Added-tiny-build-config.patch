@@ -5,8 +5,8 @@ Subject: [PATCH] Added tiny build config Adapted by CM10
 
 Change-Id: I5572fdc5a1f5dd04c4aa1a65ceef5baad0abe514
 ---
- target/product/tiny.mk |  218 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 218 insertions(+)
+ target/product/tiny.mk |  219 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 219 insertions(+)
  create mode 100644 target/product/tiny.mk
 
 diff --git a/target/product/tiny.mk b/target/product/tiny.mk
@@ -14,7 +14,7 @@ new file mode 100644
 index 0000000..c6dc964
 --- /dev/null
 +++ b/target/product/tiny.mk
-@@ -0,0 +1,218 @@
+@@ -0,0 +1,219 @@
 +# Copyright (C) 2012 The Android Open Source Project
 +#
 +# Licensed under the Apache License, Version 2.0 (the "License");
@@ -113,6 +113,7 @@ index 0000000..c6dc964
 +    drmserver \
 +    dx \
 +    ext \
++    filterfw \
 +    framework2 \
 +    framework-res \
 +    hostapd \
