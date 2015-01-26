@@ -1,0 +1,3216 @@
+From b5fb22c8d58ef9d4914f5dca3151fec604d8ce1c Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Mon, 26 Jan 2015 17:08:27 +0100
+Subject: [PATCH] frameworks/base: unified patch
+
+---
+ Android.mk                                         |  25 +-
+ core/java/android/app/ContextImpl.java             |  21 -
+ core/java/android/content/pm/PackageManager.java   |  16 -
+ .../android/preference/PreferenceActivity.java     |  58 +-
+ .../android/server/BluetoothDeviceProperties.java  |  37 +-
+ core/java/android/view/HardwareRenderer.java       |   2 +-
+ .../internal/util/weather/YahooPlaceFinder.java    |   2 +-
+ core/res/AndroidManifest.xml                       |  16 -
+ core/res/res/values-el/strings.xml                 |  13 +-
+ core/res/res/values-ro/strings.xml                 |   4 +-
+ core/res/res/values/config.xml                     |   8 +-
+ core/res/res/values/strings.xml                    |  10 -
+ media/java/android/media/MiniThumbFile.java        | 163 +---
+ packages/SystemUI/res/values-el/strings.xml        |  18 +-
+ .../src/com/android/systemui/power/PowerUI.java    |  11 +-
+ .../statusbar/policy/BatteryController.java        |   6 +-
+ .../policy/impl/KeyguardUpdateMonitor.java         |  16 +-
+ .../java/com/android/server/BatteryService.java    |  28 +-
+ .../com/android/server/PowerManagerService.java    |  33 +-
+ services/java/com/android/server/SystemServer.java |  17 -
+ services/java/com/android/server/Watchdog.java     |   2 +-
+ .../java/com/android/server/am/ProcessList.java    |  40 +-
+ .../com/android/server/usb/UsbDeviceManager.java   |  12 +-
+ .../android/internal/telephony/DataCallState.java  |   2 +-
+ .../com/android/internal/telephony/JellaxyRIL.java | 908 +++++++++++++++++++++
+ .../com/android/internal/telephony/PhoneProxy.java |   4 +-
+ .../java/com/android/internal/telephony/RIL.java   |  14 -
+ .../android/internal/telephony/SamsungMSMRIL.java  | 111 +++
+ .../android/internal/telephony/Smdk4210RIL.java    |  53 --
+ .../internal/telephony/SonyQualcommRIL.java        |   6 +-
+ .../com/android/internal/telephony/TassRIL.java    | 830 +++++++++++++++++++
+ .../telephony/gsm/GsmDataConnectionTracker.java    |   2 +-
+ 32 files changed, 1979 insertions(+), 509 deletions(-)
+ create mode 100644 telephony/java/com/android/internal/telephony/JellaxyRIL.java
+ create mode 100644 telephony/java/com/android/internal/telephony/SamsungMSMRIL.java
+ create mode 100644 telephony/java/com/android/internal/telephony/TassRIL.java
+
+diff --git a/Android.mk b/Android.mk
+index 4ea530e..aca64fa 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -39,12 +39,7 @@ SECONDARY_FRAMEWORKS_SUBDIRS := \
+         media/java/android/media/audiofx \
+         media/mca/effect/java/android/media/effect \
+         media/mca/effect/java/android/media/effect/effects \
+-        voip/java/com/android/server/sip \
+-        core/java/com/android/internal/widget/multiwaveview \
+-        core/java/com/android/internal/util/weather \
+-        core/java/com/android/internal/http/multipart
+-
+-
++        voip/java/com/android/server/sip
+ 
+ include $(CLEAR_VARS)
+ 
+@@ -235,21 +230,7 @@ LOCAL_SRC_FILES += \
+ 	telephony/java/com/android/internal/telephony/IExtendedNetworkService.aidl \
+ 	voip/java/android/net/sip/ISipSession.aidl \
+ 	voip/java/android/net/sip/ISipSessionListener.aidl \
+-	voip/java/android/net/sip/ISipService.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IFmReceiver.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IFmTransmitter.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnStateChangedListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnStartedListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnErrorListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnScanListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnForcedPauseListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnForcedResetListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnBlockScanListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnRDSDataFoundListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnSignalStrengthListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnStereoListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnExtraCommandListener.aidl \
+-	fmradio/java/com/stericsson/hardware/fm/IOnAutomaticSwitchListener.aidl
++	voip/java/android/net/sip/ISipService.aidl
+ #
+ 
+ 
+@@ -578,7 +559,7 @@ include $(CLEAR_VARS)
+ 
+ LOCAL_SRC_FILES:=$(framework_docs_LOCAL_API_CHECK_SRC_FILES)
+ LOCAL_INTERMEDIATE_SOURCES:=$(framework_docs_LOCAL_INTERMEDIATE_SOURCES)
+-LOCAL_JAVA_LIBRARIES:=$(framework_docs_LOCAL_JAVA_LIBRARIES) framework
++LOCAL_JAVA_LIBRARIES:=$(framework_docs_LOCAL_JAVA_LIBRARIES)
+ LOCAL_MODULE_CLASS:=$(framework_docs_LOCAL_MODULE_CLASS)
+ LOCAL_DROIDDOC_SOURCE_PATH:=$(framework_docs_LOCAL_DROIDDOC_SOURCE_PATH)
+ LOCAL_DROIDDOC_HTML_DIR:=$(framework_docs_LOCAL_DROIDDOC_HTML_DIR)
+diff --git a/core/java/android/app/ContextImpl.java b/core/java/android/app/ContextImpl.java
+index acc1c57..b9595a5 100644
+--- a/core/java/android/app/ContextImpl.java
++++ b/core/java/android/app/ContextImpl.java
+@@ -116,13 +116,6 @@ import java.io.InputStream;
+ import java.util.ArrayList;
+ import java.util.HashMap;
+ 
+-import com.stericsson.hardware.fm.IFmReceiver;
+-import com.stericsson.hardware.fm.IFmTransmitter;
+-import com.stericsson.hardware.fm.FmReceiver;
+-import com.stericsson.hardware.fm.FmTransmitter;
+-import com.stericsson.hardware.fm.FmReceiverImpl;
+-import com.stericsson.hardware.fm.FmTransmitterImpl;
+-
+ class ReceiverRestrictedContext extends ContextWrapper {
+     ReceiverRestrictedContext(Context base) {
+         super(base);
+@@ -510,20 +503,6 @@ class ContextImpl extends Context {
+                 public Object createService(ContextImpl ctx) {
+                     return WimaxHelper.createWimaxService(ctx, ctx.mMainThread.getHandler());
+                 }});
+-
+-        registerService("fm_receiver", new ServiceFetcher() {
+-                public Object createService(ContextImpl ctx) {
+-                    IBinder b = ServiceManager.getService("fm_receiver");
+-                    IFmReceiver service = IFmReceiver.Stub.asInterface(b);
+-                    return new FmReceiverImpl(service);
+-                }});
+-
+-        registerService("fm_transmitter", new ServiceFetcher() {
+-                public Object createService(ContextImpl ctx) {
+-                    IBinder b = ServiceManager.getService("fm_transmitter");
+-                    IFmTransmitter service = IFmTransmitter.Stub.asInterface(b);
+-                    return new FmTransmitterImpl(service);
+-                }});
+     }
+ 
+     static ContextImpl getImpl(Context context) {
+diff --git a/core/java/android/content/pm/PackageManager.java b/core/java/android/content/pm/PackageManager.java
+index 74f974e..235f060 100644
+--- a/core/java/android/content/pm/PackageManager.java
++++ b/core/java/android/content/pm/PackageManager.java
+@@ -808,22 +808,6 @@ public abstract class PackageManager {
+ 
+     /**
+      * Feature for {@link #getSystemAvailableFeatures} and
+-     * {@link #hasSystemFeature}: The device is able to receive FM radio.
+-     * @hide
+-     */
+-    @SdkConstant(SdkConstantType.FEATURE)
+-    public static final String FEATURE_RADIO_FM_RECEIVER = "com.stericsson.hardware.fm.receiver";
+-
+-    /**
+-     * Feature for {@link #getSystemAvailableFeatures} and
+-     * {@link #hasSystemFeature}: The device is able to transmit FM radio.
+-     * @hide
+-     */
+-    @SdkConstant(SdkConstantType.FEATURE)
+-    public static final String FEATURE_RADIO_FM_TRANSMITTER = "com.stericsson.hardware.fm.transmitter";
+-
+-    /**
+-     * Feature for {@link #getSystemAvailableFeatures} and
+      * {@link #hasSystemFeature}: The device supports one or more methods of
+      * reporting current location.
+      */
+diff --git a/core/java/android/preference/PreferenceActivity.java b/core/java/android/preference/PreferenceActivity.java
+index 5c49596..9bfa8c0 100644
+--- a/core/java/android/preference/PreferenceActivity.java
++++ b/core/java/android/preference/PreferenceActivity.java
+@@ -150,10 +150,6 @@ public abstract class PreferenceActivity extends ListActivity implements
+      */
+     public static final String EXTRA_SHOW_FRAGMENT_TITLE = ":android:show_fragment_title";
+ 
+-    // fix for title text for startPreferencePanel in a single pane mode
+-    /** @hide */
+-    public static final String EXTRA_SHOW_FRAGMENT_TITLE_TEXT = ":android:show_fragment_title_text";
+-
+     /**
+      * When starting this activity and using {@link #EXTRA_SHOW_FRAGMENT},
+      * this extra can also be specify to supply the short title to be shown for
+@@ -162,11 +158,6 @@ public abstract class PreferenceActivity extends ListActivity implements
+     public static final String EXTRA_SHOW_FRAGMENT_SHORT_TITLE
+             = ":android:show_fragment_short_title";
+ 
+-    // fix for short title text for startPreferencePanel in a single pane mode
+-    /** @hide */
+-    public static final String EXTRA_SHOW_FRAGMENT_SHORT_TITLE_TEXT
+-            = ":android:show_fragment_short_title_text";
+-
+     /**
+      * When starting this activity, the invoking Intent can contain this extra
+      * boolean that the header list should not be displayed.  This is most often
+@@ -551,13 +542,6 @@ public abstract class PreferenceActivity extends ListActivity implements
+                     CharSequence initialShortTitleStr = initialShortTitle != 0
+                             ? getText(initialShortTitle) : null;
+                     showBreadCrumbs(initialTitleStr, initialShortTitleStr);
+-                } else {
+-                    CharSequence initialTitleStr = getIntent().getStringExtra(EXTRA_SHOW_FRAGMENT_TITLE_TEXT);
+-                    if ( initialTitleStr != null ) {
+-                        CharSequence initialShortTitleStr
+-                                = getIntent().getStringExtra(EXTRA_SHOW_FRAGMENT_SHORT_TITLE_TEXT);
+-                        showBreadCrumbs(initialTitleStr, initialShortTitleStr);
+-                    }
+                 }
+ 
+             } else {
+@@ -591,13 +575,6 @@ public abstract class PreferenceActivity extends ListActivity implements
+                 CharSequence initialShortTitleStr = initialShortTitle != 0
+                         ? getText(initialShortTitle) : null;
+                 showBreadCrumbs(initialTitleStr, initialShortTitleStr);
+-            } else {
+-                CharSequence initialTitleStr = getIntent().getStringExtra(EXTRA_SHOW_FRAGMENT_TITLE_TEXT);
+-                if ( initialTitleStr != null ) {
+-                    CharSequence initialShortTitleStr
+-                            = getIntent().getStringExtra(EXTRA_SHOW_FRAGMENT_SHORT_TITLE_TEXT);
+-                    showBreadCrumbs(initialTitleStr, initialShortTitleStr);
+-                }
+             }
+         } else if (mHeaders.size() > 0) {
+             setListAdapter(new HeaderAdapter(this, mHeaders));
+@@ -1049,21 +1026,7 @@ public abstract class PreferenceActivity extends ListActivity implements
+         intent.putExtra(EXTRA_NO_HEADERS, true);
+         return intent;
+     }
+-
+-    // fix for title text for startPreferencePanel in a single pane mode
+-    /** @hide */
+-    public Intent onBuildStartFragmentIntent(String fragmentName, Bundle args,
+-            CharSequence titleText, CharSequence shortTitleText) {
+-        Intent intent = new Intent(Intent.ACTION_MAIN);
+-        intent.setClass(this, getClass());
+-        intent.putExtra(EXTRA_SHOW_FRAGMENT, fragmentName);
+-        intent.putExtra(EXTRA_SHOW_FRAGMENT_ARGUMENTS, args);
+-        intent.putExtra(EXTRA_SHOW_FRAGMENT_TITLE_TEXT, titleText);
+-        intent.putExtra(EXTRA_SHOW_FRAGMENT_SHORT_TITLE_TEXT, shortTitleText);
+-        intent.putExtra(EXTRA_NO_HEADERS, true);
+-        return intent;
+-    }
+-
++    
+     /**
+      * Like {@link #startWithFragment(String, Bundle, Fragment, int, int, int)}
+      * but uses a 0 titleRes.
+@@ -1100,18 +1063,6 @@ public abstract class PreferenceActivity extends ListActivity implements
+         }
+     }
+ 
+-    // fix for title text for startPreferencePanel in a single pane mode
+-    /** @hide */
+-    public void startWithFragment(String fragmentName, Bundle args, Fragment resultTo,
+-            int resultRequestCode, CharSequence titleText, CharSequence shortTitleText) {
+-        Intent intent = onBuildStartFragmentIntent(fragmentName, args, titleText, shortTitleText);
+-        if (resultTo == null) {
+-            startActivity(intent);
+-        } else {
+-            resultTo.startActivityForResult(intent, resultRequestCode);
+-        }
+-    }
+-
+     /**
+      * Change the base title of the bread crumbs for the current preferences.
+      * This will normally be called for you.  See
+@@ -1302,12 +1253,7 @@ public abstract class PreferenceActivity extends ListActivity implements
+     public void startPreferencePanel(String fragmentClass, Bundle args, int titleRes,
+             CharSequence titleText, Fragment resultTo, int resultRequestCode) {
+         if (mSinglePane) {
+-            // fix for title text for startPreferencePanel in a single pane mode
+-            if (titleRes == 0 && titleText != null) {
+-                startWithFragment(fragmentClass, args, resultTo, resultRequestCode, titleText, null);
+-            } else {
+-                startWithFragment(fragmentClass, args, resultTo, resultRequestCode, titleRes, 0);
+-            }
++            startWithFragment(fragmentClass, args, resultTo, resultRequestCode, titleRes, 0);
+         } else {
+             Fragment f = Fragment.instantiate(this, fragmentClass, args);
+             if (resultTo != null) {
+diff --git a/core/java/android/server/BluetoothDeviceProperties.java b/core/java/android/server/BluetoothDeviceProperties.java
+index 7d5f0b4..fe3ef79 100644
+--- a/core/java/android/server/BluetoothDeviceProperties.java
++++ b/core/java/android/server/BluetoothDeviceProperties.java
+@@ -58,37 +58,16 @@ class BluetoothDeviceProperties {
+                 }
+                 if (name.equals("UUIDs") || name.equals("Nodes")) {
+                     StringBuilder str = new StringBuilder();
+-                    i++;
+-                    if (i < properties.length) {
+-                        len = Integer.valueOf(properties[i]);
+-                        for (int j = 0; j < len; j++) {
+-                            i++;
+-                            if (i < properties.length) {
+-                                str.append(properties[i]);
+-                                str.append(",");
+-                            } else {
+-                                Log.e(TAG, "Error: Remote Device Property Value at index "
+-                                    + i + " is missing");
+-                                continue;
+-                            }
+-                        }
+-                        if (len > 0) {
+-                            newValue = str.toString();
+-                        }
+-                    } else {
+-                        Log.e(TAG, "Error: Remote Device Property Value at index "
+-                            + i + " is missing");
+-                        continue;
++                    len = Integer.valueOf(properties[++i]);
++                    for (int j = 0; j < len; j++) {
++                        str.append(properties[++i]);
++                        str.append(",");
+                     }
+-                } else {
+-                    i++;
+-                    if (i < properties.length) {
+-                        newValue = properties[i];
+-                    } else {
+-                        Log.e(TAG, "Error: Remote Device Property Value at index "
+-                            + i + " is missing");
+-                        continue;
++                    if (len > 0) {
++                        newValue = str.toString();
+                     }
++                } else {
++                    newValue = properties[++i];
+                 }
+ 
+                 propertyValues.put(name, newValue);
+diff --git a/core/java/android/view/HardwareRenderer.java b/core/java/android/view/HardwareRenderer.java
+index dc99561..62544a4 100644
+--- a/core/java/android/view/HardwareRenderer.java
++++ b/core/java/android/view/HardwareRenderer.java
+@@ -623,7 +623,7 @@ public abstract class HardwareRenderer {
+         static boolean sTileRendering;
+         static {
+             String dirtyProperty = SystemProperties.get(RENDER_DIRTY_REGIONS_PROPERTY, "true");
+-            String trProperty = SystemProperties.get(TILE_RENDERING_PROPERTY, "true");
++            String trProperty = SystemProperties.get(TILE_RENDERING_PROPERTY, "false");
+             //noinspection PointlessBooleanExpression,ConstantConditions
+             //enable dirty regions if tile-rendering enabled or dirty regions property enabled
+             sTileRendering = "true".equalsIgnoreCase(trProperty);
+diff --git a/core/java/com/android/internal/util/weather/YahooPlaceFinder.java b/core/java/com/android/internal/util/weather/YahooPlaceFinder.java
+index d8738ba..cac7275 100644
+--- a/core/java/com/android/internal/util/weather/YahooPlaceFinder.java
++++ b/core/java/com/android/internal/util/weather/YahooPlaceFinder.java
+@@ -40,4 +40,4 @@ public class YahooPlaceFinder {
+         return new WeatherXmlParser(c).parsePlaceFinderResponse(response);
+     }
+ 
+-}
+\ No newline at end of file
++}
+diff --git a/core/res/AndroidManifest.xml b/core/res/AndroidManifest.xml
+index f674e66..66dcd09 100644
+--- a/core/res/AndroidManifest.xml
++++ b/core/res/AndroidManifest.xml
+@@ -612,22 +612,6 @@
+         android:label="@string/permlab_vibrate"
+         android:description="@string/permdesc_vibrate" />
+ 
+-    <!-- Allows access to the FM Radio receiver
+-        @hide Pending API council approval -->
+-    <permission android:name="com.stericsson.permission.FM_RADIO_RECEIVER"
+-        android:permissionGroup="android.permission-group.HARDWARE_CONTROLS"
+-        android:protectionLevel="normal"
+-        android:label="@string/permlab_fm_radio_receiver"
+-        android:description="@string/permdesc_fm_radio_receiver" />
+-
+-    <!-- Allows access to the FM Radio transmitter
+-         @hide Pending API council approval -->
+-    <permission android:name="com.stericsson.permission.FM_RADIO_TRANSMITTER"
+-        android:permissionGroup="android.permission-group.HARDWARE_CONTROLS"
+-        android:protectionLevel="dangerous"
+-        android:label="@string/permlab_fm_radio_transmitter"
+-        android:description="@string/permdesc_fm_radio_transmitter" />
+-
+     <!-- Allows access to the flashlight -->
+     <permission android:name="android.permission.FLASHLIGHT"
+         android:permissionGroup="android.permission-group.HARDWARE_CONTROLS"
+diff --git a/core/res/res/values-el/strings.xml b/core/res/res/values-el/strings.xml
+index 607ff4a..d3436a7 100644
+--- a/core/res/res/values-el/strings.xml
++++ b/core/res/res/values-el/strings.xml
+@@ -941,7 +941,7 @@
+     <string name="yes" msgid="5362982303337969312">"OK"</string>
+     <string name="no" msgid="5141531044935541497">"Ακύρωση"</string>
+     <string name="dialog_alert_title" msgid="2049658708609043103">"Προσοχή"</string>
+-    <string name="loading" msgid="7933681260296021180">"Φόρτωση\u2026"</string>
++    <string name="loading" msgid="7933681260296021180">"Φόρτωση…"</string>
+     <string name="capital_on" msgid="1544682755514494298">"Ενεργό"</string>
+     <string name="capital_off" msgid="6815870386972805832">"Ανενεργό"</string>
+     <string name="whichApplication" msgid="4533185947064773386">"Ολοκλήρωση ενέργειας με τη χρήση"</string>
+@@ -1011,6 +1011,8 @@
+     <item quantity="other" msgid="7915895323644292768">"Υπάρχουν διαθέσιμα ανοικτά δίκτυα Wi-Fi"</item>
+   </plurals>
+     <string name="wifi_available_sign_in" msgid="4029489716605255386">"Σύνδεση στο δίκτυο Wi-Fi"</string>
++    <!-- no translation found for wifi_available_sign_in_detailed (6797764740339907572) -->
++    <skip />
+     <string name="wifi_watchdog_network_disabled" msgid="7904214231651546347">"Δεν είναι δυνατή η σύνδεση στο Wi-Fi"</string>
+     <string name="wifi_watchdog_network_disabled_detailed" msgid="5548780776418332675">" έχει κακή σύνδεση στο Διαδίκτυο."</string>
+     <string name="wifi_p2p_dialog_title" msgid="97611782659324517">"Wi-Fi Direct"</string>
+@@ -1275,7 +1277,7 @@
+     <string name="share_action_provider_share_with" msgid="5247684435979149216">"Κοινή χρήση με"</string>
+     <string name="status_bar_device_locked" msgid="3092703448690669768">"Η συσκευή κλειδώθηκε."</string>
+     <string name="list_delimeter" msgid="3975117572185494152">", "</string>
+-    <string name="sending" msgid="3245653681008218030">"Γίνεται αποστολή\u2026"</string>
++    <string name="sending" msgid="3245653681008218030">"Γίνεται αποστολή…"</string>
+     <string name="launchBrowserDefault" msgid="2057951947297614725">"Εκκίνηση προγράμματος περιήγησης;"</string>
+     <string name="SetupCallDefault" msgid="5834948469253758575">"Αποδοχή κλήσης;"</string>
+     <string name="activity_resolver_use_always" msgid="8017770747801494933">"Πάντα"</string>
+@@ -1312,10 +1314,10 @@
+     <!-- Reboot Progress Dialog. This is shown if the user chooses to reboot the phone. -->
+ 
+     <!-- label for item that screenshots in phone options dialog -->
+-    <string name="global_action_screenshot">Στιγμιότυπο οθόνης</string>
++    <string name="global_action_screenshot">Screenshot</string>
+ 
+     <!-- label for item that toggles expand desktop mode -->
+-    <string name="global_actions_toggle_expanded_desktop_mode">Επέκταση επιφάνειας</string>
++    <string name="global_actions_toggle_expanded_desktop_mode">Επέκταση επιφάνειας εργασίας</string>
+     <!-- status message in phone options dialog for when expand desktop mode is on -->
+     <string name="global_actions_expanded_desktop_mode_on_status">Ενεργή</string>
+     <!-- status message in phone options dialog for when expand desktop mode is off -->
+@@ -1337,8 +1339,7 @@
+     <!-- Reboot Progress Dialog. This is shown if the user chooses to reboot the phone. -->
+     <string name="reboot_progress">Επανεκκίνηση\u2026</string>
+     <!-- Reboot Confirmation Dialog.  When the user chooses to reboot the phone, there will be a confirmation dialog.  This is the message. -->
+-    <string name="reboot_confirm" product="tablet">Το tablet σας θα κάνει επανεκκίνηση.</string>
+-    <string name="reboot_confirm" product="default">Το τηλέφωνό σας θα κάνει επανεκκίνηση.</string>
++    <string name="reboot_confirm">Το τηλέφωνό σας θα κάνει επανεκκίνηση.</string>
+ 
+     <!-- label for item that reboots the phone in phone options dialog -->
+     <string name="global_action_reboot">Επανεκκίνηση</string>
+diff --git a/core/res/res/values-ro/strings.xml b/core/res/res/values-ro/strings.xml
+index 3350750..6f894b6 100644
+--- a/core/res/res/values-ro/strings.xml
++++ b/core/res/res/values-ro/strings.xml
+@@ -945,8 +945,8 @@
+     <string name="no" msgid="5141531044935541497">"Anulaţi"</string>
+     <string name="dialog_alert_title" msgid="2049658708609043103">"Atenţie"</string>
+     <string name="loading" msgid="7933681260296021180">"Se încarcă…"</string>
+-    <string name="capital_on" msgid="1544682755514494298">"PORNIT"</string>
+-    <string name="capital_off" msgid="6815870386972805832">"OPRIT"</string>
++    <string name="capital_on" msgid="1544682755514494298">"ACTIVAT"</string>
++    <string name="capital_off" msgid="6815870386972805832">"DEZACTIVAT"</string>
+     <string name="whichApplication" msgid="4533185947064773386">"Finalizare acţiune utilizând"</string>
+     <string name="alwaysUse" msgid="4583018368000610438">"Se utilizează în mod prestabilit pentru această acţiune."</string>
+     <string name="clearDefaultHintMsg" msgid="3252584689512077257">"Ştergeţi setările prestabilite din Setări de sistem &gt; Aplicaţii &gt; Descărcate."</string>
+diff --git a/core/res/res/values/config.xml b/core/res/res/values/config.xml
+index 3bfbe28..a6b8f93 100755
+--- a/core/res/res/values/config.xml
++++ b/core/res/res/values/config.xml
+@@ -317,7 +317,7 @@
+     <bool name="config_unplugTurnsOnScreen">false</bool>
+ 
+     <!-- If this is true, the screen will fade off. -->
+-    <bool name="config_animateScreenLights">true</bool>
++    <bool name="config_animateScreenLights">false</bool>
+ 
+     <!-- If this is true, key chords can be used to take a screenshot on the device. -->
+     <bool name="config_enableScreenshotChord">true</bool>
+@@ -973,4 +973,10 @@
+ 
+     <!-- Boolean to enable Stylus gestures -->
+     <bool name="config_stylusGestures">false</bool>
++
++    <!-- Boolean indicating whether Softap rely only on one interface -->
++    <bool name="config_wifi_ap_use_single_interface">true</bool>
++
++    <!-- Boolean indicating whether Softap require reloading AP firware -->
++    <bool name="config_wifi_ap_firmware_reload">false</bool>
+ </resources>
+diff --git a/core/res/res/values/strings.xml b/core/res/res/values/strings.xml
+index 4ac4065..ee622cc 100755
+--- a/core/res/res/values/strings.xml
++++ b/core/res/res/values/strings.xml
+@@ -1295,16 +1295,6 @@
+     <string name="permdesc_vibrate">Allows the app to control the vibrator.</string>
+ 
+     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+-    <string name="permlab_fm_radio_receiver">control FM receiver</string>
+-    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+-    <string name="permdesc_fm_radio_receiver">Allows the application to control the FM receiver.</string>
+-
+-    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+-    <string name="permlab_fm_radio_transmitter">control FM transmitter</string>
+-    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+-    <string name="permdesc_fm_radio_transmitter">Allows the application to control the FM transmitter.</string>
+-
+-    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+     <string name="permlab_flashlight">control flashlight</string>
+     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. -->
+     <string name="permdesc_flashlight">Allows the app to control the flashlight.</string>
+diff --git a/media/java/android/media/MiniThumbFile.java b/media/java/android/media/MiniThumbFile.java
+index 9825857..63b149c 100644
+--- a/media/java/android/media/MiniThumbFile.java
++++ b/media/java/android/media/MiniThumbFile.java
+@@ -45,14 +45,8 @@ import java.util.Hashtable;
+  */
+ public class MiniThumbFile {
+     private static final String TAG = "MiniThumbFile";
+-    private static final int MINI_THUMB_DATA_FILE_VERSION = 4;
++    private static final int MINI_THUMB_DATA_FILE_VERSION = 3;
+     public static final int BYTES_PER_MINTHUMB = 10000;
+-
+-    private static final int BYTES_PER_MINTHUMB_INDEX = 8;
+-    private FileChannel mIndexChannel;
+-    private RandomAccessFile mMiniThumbIndexFile;
+-    private final boolean debug = false;;
+-
+     private static final int HEADER_SIZE = 1 + 8 + 4;
+     private Uri mUri;
+     private RandomAccessFile mMiniThumbFile;
+@@ -104,57 +98,6 @@ public class MiniThumbFile {
+         }
+     }
+ 
+-    private String randomAccessIndexFilePath(int version) {
+-        String directoryName =
+-                Environment.getExternalStorageDirectory().toString()
+-                + "/DCIM/.thumbnails";
+-        return directoryName + "/.thumbindex" + version + "-" + mUri.hashCode();
+-    }
+-
+-    private void removeOldIndexFile() {
+-        String oldPath = randomAccessIndexFilePath(MINI_THUMB_DATA_FILE_VERSION - 1);
+-        File oldFile = new File(oldPath);
+-        if (oldFile.exists()) {
+-            try {
+-                oldFile.delete();
+-            } catch (SecurityException ex) {
+-                // ignore
+-            }
+-        }
+-    }
+-
+-    private RandomAccessFile miniThumbIndexFile() {
+-        if (mMiniThumbIndexFile == null) {
+-            removeOldIndexFile();
+-            String path = randomAccessIndexFilePath(MINI_THUMB_DATA_FILE_VERSION);
+-            File directory = new File(path).getParentFile();
+-            if (!directory.isDirectory()) {
+-                if (!directory.mkdirs()) {
+-                    Log.e(TAG, "Unable to create .thumbnails directory "
+-                            + directory.toString());
+-                }
+-            }
+-            File f = new File(path);
+-
+-            try {
+-                mMiniThumbIndexFile = new RandomAccessFile(f, "rw");
+-            } catch (IOException ex) {
+-                // Open as read-only so we can at least read the existing
+-                // thumbnails.
+-                try {
+-                    mMiniThumbIndexFile = new RandomAccessFile(f, "r");
+-                } catch (IOException ex2) {
+-                    // ignore exception
+-                    Log.e(TAG, "miniThumbIndexFile open r exception: " + f);
+-                }
+-            }
+-            if (mMiniThumbIndexFile != null) {
+-                mIndexChannel = mMiniThumbIndexFile.getChannel();
+-            }
+-        }
+-        return mMiniThumbIndexFile;
+-    }
+-
+     private RandomAccessFile miniThumbDataFile() {
+         if (mMiniThumbFile == null) {
+             removeOldFile();
+@@ -185,8 +128,6 @@ public class MiniThumbFile {
+         return mMiniThumbFile;
+     }
+ 
+-
+-
+     public MiniThumbFile(Uri uri) {
+         mUri = uri;
+         mBuffer = ByteBuffer.allocateDirect(BYTES_PER_MINTHUMB);
+@@ -203,94 +144,6 @@ public class MiniThumbFile {
+         }
+     }
+ 
+-    /**
+-    * Get the index of thumbnail, which is the real saving location.
+-    * @param id the raw id in Mediaprovider database.
+-    * @param create when you want to create a new thumbnail, set to true; when generally query 
+-    * thumbnail saved index, set to false.
+-    */
+-    private long getIndex(long id, boolean create){
+-        RandomAccessFile r = miniThumbIndexFile();
+-        ByteBuffer buf = ByteBuffer.allocateDirect(BYTES_PER_MINTHUMB_INDEX);
+-
+-        if (r != null) {
+-            long pos = 0;
+-            //first 8 bytes are for saving next create thumbnail block number!
+-            //so if create set, then begin from 0, others begin from real index 
+-            // (id+1)*BYTES_PER_MINTHUMB_INDEX.
+-            if (!create) {
+-                pos = (id + 1) * BYTES_PER_MINTHUMB_INDEX;
+-            }
+-
+-            FileLock lock = null;
+-            try {
+-                buf.clear();
+-                buf.limit(BYTES_PER_MINTHUMB_INDEX);
+-
+-                lock = mIndexChannel.lock(pos, BYTES_PER_MINTHUMB_INDEX, false);
+-                //check that we can read the following 8 bytes
+-                //which is the index position of thumbnail.
+-
+-                int read = mIndexChannel.read(buf, pos);
+-
+-                if (read == BYTES_PER_MINTHUMB_INDEX) {
+-                    buf.position(0);
+-                    if (create) {
+-                        //first, write next index.
+-                        long now = buf.getLong();
+-                        buf.clear();
+-                        buf.position(0);
+-                        buf.putLong(++now);
+-                        buf.flip();
+-                        int write = mIndexChannel.write(buf, pos);
+-
+-                        //second, write this id's index
+-                        if(BYTES_PER_MINTHUMB_INDEX == write) {
+-                            if (lock != null) lock.release();
+-                            pos = (id + 1) * BYTES_PER_MINTHUMB_INDEX;
+-                            lock = mIndexChannel.lock(pos, BYTES_PER_MINTHUMB_INDEX, false);
+-                            buf.flip();
+-                            write = mIndexChannel.write(buf, pos);
+-                            if(debug) Log.d(TAG, "getIndex with create. index: " + now + 
+-                                               "corresponding id: " + id + ", index is: " + pos);
+-                        }
+-                        return now;
+-                    } else {
+-                        long p = buf.getLong();
+-                        if(debug) Log.d(TAG, "getIndex with no create. index: " + p);
+-                        return p;
+-                    }
+-                } else if(-1 == read) {
+-                    //If the index file is empty, initialize first index to 0.
+-                    if(0 == r.length()){
+-                        buf.clear();
+-                        buf.position(0);
+-                        buf.putLong(0);
+-                        buf.flip();
+-                        int write = mIndexChannel.write(buf, 0);
+-                        if(debug) Log.d(TAG, "initialize first index");
+-                        if(BYTES_PER_MINTHUMB_INDEX == write) return 0;
+-                    }
+-                }
+-            } catch (IOException ex) {
+-                Log.e(TAG, "Got exception checking file index: ", ex);
+-            } catch (RuntimeException ex) {
+-                // Other NIO related exception like disk full, read only channel..etc
+-                Log.e(TAG, "Got exception when reading index, id = " + id +
+-		                 ", disk full or mount read-only? " + ex.getClass());
+-            } finally {
+-                try {
+-                    if (lock != null) lock.release();
+-                }
+-                catch (IOException ex) {
+-                    // ignore it.
+-                    Log.e(TAG, "release lock: ", ex);
+-                }
+-            }
+-        }
+-        return 0;
+-    }
+-
+     // Get the magic number for the specified id in the mini-thumb file.
+     // Returns 0 if the magic is not available.
+     public synchronized long getMagic(long id) {
+@@ -298,14 +151,8 @@ public class MiniThumbFile {
+         // defined as having the right magic number at the offset
+         // reserved for this "id".
+         RandomAccessFile r = miniThumbDataFile();
+-
+         if (r != null) {
+-
+-            long pos = getIndex(id, false);
+-            if(pos < 0) return 0;
+-
+-            pos *= BYTES_PER_MINTHUMB;
+-
++            long pos = id * BYTES_PER_MINTHUMB;
+             FileLock lock = null;
+             try {
+                 mBuffer.clear();
+@@ -343,11 +190,7 @@ public class MiniThumbFile {
+         RandomAccessFile r = miniThumbDataFile();
+         if (r == null) return;
+ 
+-
+-        long pos = getIndex(id, true);
+-        if(pos < 0) return;
+-
+-        pos *= BYTES_PER_MINTHUMB;
++        long pos = id * BYTES_PER_MINTHUMB;
+         FileLock lock = null;
+         try {
+             if (data != null) {
+diff --git a/packages/SystemUI/res/values-el/strings.xml b/packages/SystemUI/res/values-el/strings.xml
+index 94c5a9d..7109930 100644
+--- a/packages/SystemUI/res/values-el/strings.xml
++++ b/packages/SystemUI/res/values-el/strings.xml
+@@ -151,7 +151,7 @@
+     <string name="powerwidget_screen_timeout_toast">Λήξη χρον. ορίου οθόνης: %1$d %2$s</string>
+ 
+     <!-- Label in the system panel for flashlight state [CHAR LIMIT=30] -->
+-    <string name="status_bar_settings_flashlight">Φακός</string>
++    <string name="status_bar_settings_flashlight">Φακός LED</string>
+ 
+     <!-- Label in the system panel for mobile data state [CHAR LIMIT=30] -->
+     <string name="status_bar_settings_mobile_data">Δεδομένα</string>
+@@ -161,12 +161,12 @@
+ 
+     <!-- Dialog title for navigation bar button selection -->
+     <string name="navbar_dialog_title">Επιλέξτε λειτουργία για εκχώρηση</string>
+-    <string name="navbar_home_button">Πλήκτρο Home</string>
+-    <string name="navbar_recent_button">Πλήκτρο Recent</string>
+-    <string name="navbar_search_button">Πλήκτρο Search</string>
+-    <string name="navbar_back_button">Πλήκτρο Back</string>
+-    <string name="navbar_empty_button">Άδειο πλήκτρο</string>
+-    <string name="navbar_menu_conditional_button">Πλήκτρο Menu (αυτόματη απόκρυψη)</string>
+-    <string name="navbar_menu_always_button">Πλήκτρο Menu (εμφάνιση πάντα)</string>
+-    <string name="navbar_menu_big_button">Πλήκτρο Menu</string>
++    <string name="navbar_home_button">Κουμπί Home</string>
++    <string name="navbar_recent_button">Κουμπί Recent</string>
++    <string name="navbar_search_button">Κουμπί Search</string>
++    <string name="navbar_back_button">Κουμπί Back</string>
++    <string name="navbar_empty_button">Άδειο κουμπί</string>
++    <string name="navbar_menu_conditional_button">Κουμπί Menu (αυτόματη απόκρυψη)</string>
++    <string name="navbar_menu_always_button">Κουμπί Menu (εμφάνιση πάντα)</string>
++    <string name="navbar_menu_big_button">Κουμπί Menu</string>
+ </resources>
+diff --git a/packages/SystemUI/src/com/android/systemui/power/PowerUI.java b/packages/SystemUI/src/com/android/systemui/power/PowerUI.java
+index b6b7eb1..3c30f5d 100644
+--- a/packages/SystemUI/src/com/android/systemui/power/PowerUI.java
++++ b/packages/SystemUI/src/com/android/systemui/power/PowerUI.java
+@@ -120,8 +120,6 @@ public class PowerUI extends SystemUI {
+ 
+                 final boolean plugged = mPlugType != 0;
+                 final boolean oldPlugged = oldPlugType != 0;
+-                final boolean charging = mBatteryStatus == BatteryManager.BATTERY_STATUS_CHARGING;
+-                final boolean oldCharging = oldBatteryStatus == BatteryManager.BATTERY_STATUS_CHARGING;
+ 
+                 int oldBucket = findBatteryLevelBucket(oldBatteryLevel);
+                 int bucket = findBatteryLevelBucket(mBatteryLevel);
+@@ -136,7 +134,6 @@ public class PowerUI extends SystemUI {
+                     Slog.d(TAG, "invalidCharger " + oldInvalidCharger + " --> " + mInvalidCharger);
+                     Slog.d(TAG, "bucket         " + oldBucket + " --> " + bucket);
+                     Slog.d(TAG, "plugged        " + oldPlugged + " --> " + plugged);
+-                    Slog.d(TAG, "charging       " + oldCharging + " --> " + charging);
+                 }
+ 
+                 if (oldInvalidCharger == 0 && mInvalidCharger != 0) {
+@@ -150,17 +147,17 @@ public class PowerUI extends SystemUI {
+                     return;
+                 }
+ 
+-                if (!charging
+-                        && (bucket < oldBucket || oldCharging)
++                if (!plugged
++                        && (bucket < oldBucket || oldPlugged)
+                         && mBatteryStatus != BatteryManager.BATTERY_STATUS_UNKNOWN
+                         && bucket < 0) {
+                     showLowBatteryWarning();
+ 
+                     // only play SFX when the dialog comes up or the bucket changes
+-                    if (bucket != oldBucket || oldCharging) {
++                    if (bucket != oldBucket || oldPlugged) {
+                         playLowBatterySound();
+                     }
+-                } else if (charging || (bucket > oldBucket && bucket > 0)) {
++                } else if (plugged || (bucket > oldBucket && bucket > 0)) {
+                     dismissLowBatteryWarning();
+                 } else if (mBatteryLevelTextView != null) {
+                     showLowBatteryWarning();
+diff --git a/packages/SystemUI/src/com/android/systemui/statusbar/policy/BatteryController.java b/packages/SystemUI/src/com/android/systemui/statusbar/policy/BatteryController.java
+index f735c64..767d383 100644
+--- a/packages/SystemUI/src/com/android/systemui/statusbar/policy/BatteryController.java
++++ b/packages/SystemUI/src/com/android/systemui/statusbar/policy/BatteryController.java
+@@ -63,7 +63,6 @@ public class BatteryController extends BroadcastReceiver {
+     private static final int BATTERY_TEXT_STYLE_MIN     = R.string.status_bar_settings_battery_meter_min_format;
+ 
+     private boolean mBatteryPlugged = false;
+-    private boolean mBatteryCharging = false;
+     private int mBatteryStyle;
+     private int mBatteryIcon = BATTERY_ICON_STYLE_NORMAL;
+ 
+@@ -112,7 +111,6 @@ public class BatteryController extends BroadcastReceiver {
+         if (action.equals(Intent.ACTION_BATTERY_CHANGED)) {
+             final int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+             mBatteryPlugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0;
+-            mBatteryCharging = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN) == BatteryManager.BATTERY_STATUS_CHARGING;
+             int N = mIconViews.size();
+             for (int i=0; i<N; i++) {
+                 ImageView v = mIconViews.get(i);
+@@ -137,12 +135,12 @@ public class BatteryController extends BroadcastReceiver {
+ 
+         if (mBatteryStyle == BATTERY_STYLE_NORMAL) {
+             mIcon = (View.VISIBLE);
+-            mIconStyle = mBatteryCharging ? BATTERY_ICON_STYLE_CHARGE
++            mIconStyle = mBatteryPlugged ? BATTERY_ICON_STYLE_CHARGE
+                     : BATTERY_ICON_STYLE_NORMAL;
+         } else if (mBatteryStyle == BATTERY_STYLE_PERCENT) {
+             mIcon = (View.VISIBLE);
+             mText = (View.VISIBLE);
+-            mIconStyle = mBatteryCharging ? BATTERY_ICON_STYLE_CHARGE_MIN
++            mIconStyle = mBatteryPlugged ? BATTERY_ICON_STYLE_CHARGE_MIN
+                     : BATTERY_ICON_STYLE_NORMAL_MIN;
+         }
+ 
+diff --git a/policy/src/com/android/internal/policy/impl/KeyguardUpdateMonitor.java b/policy/src/com/android/internal/policy/impl/KeyguardUpdateMonitor.java
+index 47990d8..1f9d0e3 100644
+--- a/policy/src/com/android/internal/policy/impl/KeyguardUpdateMonitor.java
++++ b/policy/src/com/android/internal/policy/impl/KeyguardUpdateMonitor.java
+@@ -22,8 +22,6 @@ import android.content.Context;
+ import android.content.Intent;
+ import android.content.IntentFilter;
+ import android.database.ContentObserver;
+-import static android.os.BatteryManager.BATTERY_STATUS_CHARGING;
+-import static android.os.BatteryManager.BATTERY_STATUS_DISCHARGING;
+ import static android.os.BatteryManager.BATTERY_STATUS_FULL;
+ import static android.os.BatteryManager.BATTERY_STATUS_UNKNOWN;
+ import static android.os.BatteryManager.BATTERY_HEALTH_UNKNOWN;
+@@ -386,7 +384,7 @@ public class KeyguardUpdateMonitor {
+             for (int i = 0; i < mInfoCallbacks.size(); i++) {
+                 // TODO: pass BatteryStatus object to onRefreshBatteryInfo() instead...
+                 mInfoCallbacks.get(i).onRefreshBatteryInfo(
+-                    shouldShowBatteryInfo(),isCharging(batteryStatus), batteryStatus.level);
++                    shouldShowBatteryInfo(),isPluggedIn(batteryStatus), batteryStatus.level);
+             }
+         }
+     }
+@@ -439,10 +437,6 @@ public class KeyguardUpdateMonitor {
+                 || status.plugged == BatteryManager.BATTERY_PLUGGED_USB;
+     }
+ 
+-    private static boolean isCharging(BatteryStatus status) {
+-        return status.status == BatteryManager.BATTERY_STATUS_CHARGING;
+-    }
+-
+     private static boolean isBatteryUpdateInteresting(BatteryStatus old, BatteryStatus current, Context context) {
+         final boolean nowPluggedIn = isPluggedIn(current);
+         final boolean wasPluggedIn = isPluggedIn(old);
+@@ -619,7 +613,7 @@ public class KeyguardUpdateMonitor {
+         if (!mInfoCallbacks.contains(callback)) {
+             mInfoCallbacks.add(callback);
+             // Notify listener of the current state
+-            callback.onRefreshBatteryInfo(shouldShowBatteryInfo(),isCharging(mBatteryStatus),
++            callback.onRefreshBatteryInfo(shouldShowBatteryInfo(),isPluggedIn(mBatteryStatus),
+                     mBatteryStatus.level);
+             callback.onTimeChanged();
+             callback.onRingerModeChanged(mRingMode);
+@@ -682,10 +676,8 @@ public class KeyguardUpdateMonitor {
+     }
+ 
+     public boolean shouldShowBatteryInfo() {
+-        return (isPluggedIn(mBatteryStatus) && isDeviceCharged())
+-            || isCharging(mBatteryStatus)
+-            || isBatteryLow(mBatteryStatus)
+-            || shouldAlwaysShowBatteryInfo(mContext);
++        return isPluggedIn(mBatteryStatus) || isBatteryLow(mBatteryStatus)
++                       || shouldAlwaysShowBatteryInfo(mContext);
+     }
+ 
+     public static boolean shouldAlwaysShowBatteryInfo(Context context) {
+diff --git a/services/java/com/android/server/BatteryService.java b/services/java/com/android/server/BatteryService.java
+index 00ba59d..a049730 100644
+--- a/services/java/com/android/server/BatteryService.java
++++ b/services/java/com/android/server/BatteryService.java
+@@ -180,17 +180,13 @@ class BatteryService extends Binder {
+         update();
+     }
+ 
+-    final boolean isPlugged() {
+-        // assume we are plugged if battery state is unknown so the "stay on while plugged in" option will work
++    final boolean isPowered() {
++        // assume we are powered if battery state is unknown so the "stay on while plugged in" option will work.
+         return (mAcOnline || mUsbOnline || mBatteryStatus == BatteryManager.BATTERY_STATUS_UNKNOWN);
+     }
+ 
+-    final boolean isCharging() {
+-        return (mBatteryStatus == BatteryManager.BATTERY_STATUS_CHARGING);
+-    }
+-
+-    final boolean isPlugged(int plugTypeSet) {
+-        // assume we are plugged if battery state is unknown so
++    final boolean isPowered(int plugTypeSet) {
++        // assume we are powered if battery state is unknown so
+         // the "stay on while plugged in" option will work.
+         if (mBatteryStatus == BatteryManager.BATTERY_STATUS_UNKNOWN) {
+             return true;
+@@ -244,7 +240,7 @@ class BatteryService extends Binder {
+     private final void shutdownIfNoPower() {
+         // shut down gracefully if our battery is critically low and we are not powered.
+         // wait until the system has booted before attempting to display the shutdown dialog.
+-        if (mBatteryLevel == 0 && !isCharging() && ActivityManagerNative.isSystemReady()) {
++        if (mBatteryLevel == 0 && !isPowered() && ActivityManagerNative.isSystemReady()) {
+             Intent intent = new Intent(Intent.ACTION_REQUEST_SHUTDOWN);
+             intent.putExtra(Intent.EXTRA_KEY_CONFIRM, false);
+             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+@@ -355,19 +351,19 @@ class BatteryService extends Binder {
+                 logOutlier = true;
+             }
+ 
+-            final boolean charging = (mBatteryStatus == BatteryManager.BATTERY_STATUS_CHARGING);
+-            final boolean oldCharging = (mLastBatteryStatus == BatteryManager.BATTERY_STATUS_CHARGING);
++            final boolean plugged = mPlugType != BATTERY_PLUGGED_NONE;
++            final boolean oldPlugged = mLastPlugType != BATTERY_PLUGGED_NONE;
+ 
+             /* The ACTION_BATTERY_LOW broadcast is sent in these situations:
+-             * - just stopped charging (previously was charging) and battery level is
++             * - is just un-plugged (previously was plugged) and battery level is
+              *   less than or equal to WARNING, or
+-             * - is not charging and battery level falls to WARNING boundary
++             * - is not plugged and battery level falls to WARNING boundary
+              *   (becomes <= mLowBatteryWarningLevel).
+              */
+-            final boolean sendBatteryLow = !charging
++            final boolean sendBatteryLow = !plugged
+                     && mBatteryStatus != BatteryManager.BATTERY_STATUS_UNKNOWN
+                     && mBatteryLevel <= mLowBatteryWarningLevel
+-                    && (oldCharging || mLastBatteryLevel > mLowBatteryWarningLevel);
++                    && (oldPlugged || mLastBatteryLevel > mLowBatteryWarningLevel);
+ 
+             sendIntent();
+ 
+@@ -534,7 +530,7 @@ class BatteryService extends Binder {
+             return com.android.internal.R.drawable.stat_sys_battery;
+         } else if (mBatteryStatus == BatteryManager.BATTERY_STATUS_NOT_CHARGING
+                 || mBatteryStatus == BatteryManager.BATTERY_STATUS_FULL) {
+-            if (isPlugged() && mBatteryLevel >= 100) {
++            if (isPowered() && mBatteryLevel >= 100) {
+                 return com.android.internal.R.drawable.stat_sys_battery_charge;
+             } else {
+                 return com.android.internal.R.drawable.stat_sys_battery;
+diff --git a/services/java/com/android/server/PowerManagerService.java b/services/java/com/android/server/PowerManagerService.java
+index 661bcb0..a08be90 100644
+--- a/services/java/com/android/server/PowerManagerService.java
++++ b/services/java/com/android/server/PowerManagerService.java
+@@ -256,8 +256,7 @@ public class PowerManagerService extends IPowerManager.Stub
+     private ScreenBrightnessAnimator mScreenBrightnessAnimator;
+     private boolean mWaitingForFirstLightSensor = false;
+     private boolean mStillNeedSleepNotification;
+-    private boolean mIsPlugged = false;
+-    private boolean mIsCharging = false;
++    private boolean mIsPowered = false;
+     private IActivityManager mActivityService;
+     private IBatteryStats mBatteryStats;
+     private BatteryService mBatteryService;
+@@ -455,12 +454,10 @@ public class PowerManagerService extends IPowerManager.Stub
+         @Override
+         public void onReceive(Context context, Intent intent) {
+             synchronized (mLocks) {
+-                boolean wasPlugged = mIsPlugged;
+-                boolean wasCharging = mIsCharging;
+-                mIsPlugged = mBatteryService.isPlugged();
+-                mIsCharging = mBatteryService.isCharging();
++                boolean wasPowered = mIsPowered;
++                mIsPowered = mBatteryService.isPowered();
+ 
+-                if (mIsPlugged != wasPlugged) {
++                if (mIsPowered != wasPowered) {
+                     // update mStayOnWhilePluggedIn wake lock
+                     updateWakeLockLocked();
+ 
+@@ -475,7 +472,7 @@ public class PowerManagerService extends IPowerManager.Stub
+                     // turn on.  Some devices want this because they don't have a
+                     // charging LED.
+                     synchronized (mLocks) {
+-                        if (!wasPlugged || (mPowerState & SCREEN_ON_BIT) != 0 ||
++                        if (!wasPowered || (mPowerState & SCREEN_ON_BIT) != 0 ||
+                                 mUnplugTurnsOnScreen) {
+                             forceUserActivityLocked();
+                         }
+@@ -819,7 +816,7 @@ public class PowerManagerService extends IPowerManager.Stub
+ 
+     private void updateWakeLockLocked() {
+         final int stayOnConditions = getStayOnConditionsLocked();
+-        if (stayOnConditions != 0 && mBatteryService.isPlugged(stayOnConditions)) {
++        if (stayOnConditions != 0 && mBatteryService.isPowered(stayOnConditions)) {
+             // keep the device on if we're plugged in and mStayOnWhilePluggedIn is set.
+             mStayOnWhilePluggedInScreenDimLock.acquire();
+             mStayOnWhilePluggedInPartialLock.acquire();
+@@ -1245,8 +1242,7 @@ public class PowerManagerService extends IPowerManager.Stub
+ 
+         synchronized (mLocks) {
+             pw.println("Power Manager State:");
+-            pw.println("  mIsPlugged=" + mIsPlugged
+-                    + " mIsCharging=" + mIsCharging
++            pw.println("  mIsPowered=" + mIsPowered
+                     + " mPowerState=" + mPowerState
+                     + " mScreenOffTime=" + (SystemClock.elapsedRealtime()-mScreenOffTime)
+                     + " ms");
+@@ -2060,7 +2056,7 @@ public class PowerManagerService extends IPowerManager.Stub
+     }
+ 
+     private boolean batteryIsLow() {
+-        return (!mIsCharging &&
++        return (!mIsPowered &&
+                 mBatteryService.getBatteryLevel() <= LOW_BATTERY_THRESHOLD);
+     }
+ 
+@@ -2187,7 +2183,7 @@ public class PowerManagerService extends IPowerManager.Stub
+                         steps = (int)(ANIM_STEPS*ratio);
+                     }
+                     final int stayOnConditions = getStayOnConditionsLocked();
+-                    if (stayOnConditions != 0 && mBatteryService.isPlugged(stayOnConditions)) {
++                    if (stayOnConditions != 0 && mBatteryService.isPowered(stayOnConditions)) {
+                         // If the "stay on while plugged in" option is
+                         // turned on, then the screen will often not
+                         // automatically turn off while plugged in.  To
+@@ -2398,6 +2394,14 @@ public class PowerManagerService extends IPowerManager.Stub
+                     Message msg = mScreenBrightnessHandler
+                             .obtainMessage(ANIMATE_LIGHTS, mask, newValue);
+                     mScreenBrightnessHandler.sendMessageDelayed(msg, delay);
++                } else {
++                    final boolean doScreenAnimation = (mask & (SCREEN_BRIGHT_BIT | SCREEN_ON_BIT)) != 0;
++                    final boolean turnOff = currentValue == PowerManager.BRIGHTNESS_OFF;
++                    if (turnOff && doScreenAnimation) {
++                        // Cancel all pending animations since we're turning off
++                        mScreenBrightnessHandler.removeCallbacksAndMessages(null);
++                        screenOffFinishedAnimatingLocked(mScreenOffReason);
++                    }
+                 }
+             }
+         }
+@@ -2461,9 +2465,6 @@ public class PowerManagerService extends IPowerManager.Stub
+                     final boolean doScreenAnim = (mask & (SCREEN_BRIGHT_BIT | SCREEN_ON_BIT)) != 0;
+                     final boolean turningOff = endValue == PowerManager.BRIGHTNESS_OFF;
+                     if (turningOff && doScreenAnim) {
+-                        // Cancel all pending animations since we're turning off
+-                        mScreenBrightnessHandler.removeCallbacksAndMessages(null);
+-                        screenOffFinishedAnimatingLocked(mScreenOffReason);
+                         duration = 200; // TODO: how long should this be?
+                     }
+                     if (doScreenAnim) {
+diff --git a/services/java/com/android/server/SystemServer.java b/services/java/com/android/server/SystemServer.java
+index a422d32..300fcd8 100644
+--- a/services/java/com/android/server/SystemServer.java
++++ b/services/java/com/android/server/SystemServer.java
+@@ -69,8 +69,6 @@ import dalvik.system.Zygote;
+ import java.io.File;
+ import java.util.Timer;
+ import java.util.TimerTask;
+-import com.stericsson.hardware.fm.FmReceiverService;
+-import com.stericsson.hardware.fm.FmTransmitterService;
+ 
+ class ServerThread extends Thread {
+     private static final String TAG = "SystemServer";
+@@ -475,21 +473,6 @@ class ServerThread extends Thread {
+             }
+ 
+             try {
+-                Slog.i(TAG, "FM receiver Service");
+-                ServiceManager.addService("fm_receiver",
+-                        new FmReceiverService(context));
+-            } catch (Throwable e) {
+-                Slog.e(TAG, "Failure starting FM receiver Service", e);
+-            }
+-
+-            try {
+-                Slog.i(TAG, "FM transmitter Service");
+-                ServiceManager.addService("fm_transmitter",
+-                        new FmTransmitterService(context));
+-            } catch (Throwable e) {
+-                Slog.e(TAG, "Failure starting FM transmitter Service", e);
+-            }
+-            try {
+                 Slog.i(TAG, "UpdateLock Service");
+                 ServiceManager.addService(Context.UPDATE_LOCK_SERVICE,
+                         new UpdateLockService(context));
+diff --git a/services/java/com/android/server/Watchdog.java b/services/java/com/android/server/Watchdog.java
+index 7f0d60d..c239382 100644
+--- a/services/java/com/android/server/Watchdog.java
++++ b/services/java/com/android/server/Watchdog.java
+@@ -343,7 +343,7 @@ public class Watchdog extends Thread {
+      * text of why it is not a good time.
+      */
+     String shouldWeBeBrutalLocked(long curTime) {
+-        if (mBattery == null || !mBattery.isPlugged()) {
++        if (mBattery == null || !mBattery.isPowered()) {
+             return "battery";
+         }
+ 
+diff --git a/services/java/com/android/server/am/ProcessList.java b/services/java/com/android/server/am/ProcessList.java
+index 23fd26a..33fd080 100644
+--- a/services/java/com/android/server/am/ProcessList.java
++++ b/services/java/com/android/server/am/ProcessList.java
+@@ -122,22 +122,58 @@ class ProcessList {
+     // These are the various interesting memory levels that we will give to
+     // the OOM killer.  Note that the OOM killer only supports 6 slots, so we
+     // can't give it a different value for every possible kind of process.
+-    private final int[] mOomAdj = new int[] {
++    static final int[] mOomAdj = new int[] {
+             FOREGROUND_APP_ADJ, VISIBLE_APP_ADJ, PERCEPTIBLE_APP_ADJ,
+             BACKUP_APP_ADJ, HIDDEN_APP_MIN_ADJ, HIDDEN_APP_MAX_ADJ
+     };
+     // These are the low-end OOM level limits.  This is appropriate for an
+     // HVGA or smaller phone with less than 512MB.  Values are in KB.
+-    private final long[] mOomMinFreeLow = new long[] {
++    static final long[] mOomMinFreeLow = new long[] {
+             8192, 12288, 16384,
+             24576, 28672, 32768
+     };
++
++    // reintroduce settings of OOM adj and lowmem values via properties
++	// (lagloose 11/2012)
++    static {
++		int memAdj = 0;
++		int memMem = 0;
++		
++		memAdj = SystemProperties.getInt("sys.mem.FOREGROUND_APP_ADJ",0);
++		if (memAdj > 0) mOomAdj[0] = memAdj;
++		memAdj = SystemProperties.getInt("sys.mem.VISIBLE_APP_ADJ",0);
++		if (memAdj > 0) mOomAdj[1] = memAdj;
++		memAdj = SystemProperties.getInt("sys.mem.PERCEPTIBLE_APP_ADJ",0);
++		if (memAdj > 0) mOomAdj[2] = memAdj;
++		memAdj = SystemProperties.getInt("sys.mem.BACKUP_APP_ADJ",0);
++		if (memAdj > 0) mOomAdj[3] = memAdj;
++		memAdj = SystemProperties.getInt("sys.mem.HIDDEN_APP_MIN_ADJ",0);
++		if (memAdj > 0) mOomAdj[4] = memAdj;
++		memAdj = SystemProperties.getInt("sys.mem.HIDDEN_APP_MAX_ADJ",0);
++		if (memAdj > 0) mOomAdj[5] = memAdj;
++
++		memMem = SystemProperties.getInt("sys.mem.FOREGROUND_APP_MEM",0);
++		if (memMem > 0) mOomMinFreeLow[0] = memMem;
++		memMem = SystemProperties.getInt("sys.mem.VISIBLE_APP_MEM",0);
++		if (memMem > 0) mOomMinFreeLow[1] = memMem;
++		memMem = SystemProperties.getInt("sys.mem.PERCEPTIBLE_APP_MEM",0);
++		if (memMem > 0) mOomMinFreeLow[2] = memMem;
++		memMem = SystemProperties.getInt("sys.mem.BACKUP_APP_MEM",0);
++		if (memMem > 0) mOomMinFreeLow[3] = memMem;
++		memMem = SystemProperties.getInt("sys.mem.HIDDEN_APP_MIN_MEM",0);
++		if (memMem > 0) mOomMinFreeLow[4] = memMem;
++		memMem = SystemProperties.getInt("sys.mem.HIDDEN_APP_MAX_MEM",0);
++		if (memMem > 0) mOomMinFreeLow[5] = memMem;
++	}
++	// end (lagloose)
++	
+     // These are the high-end OOM level limits.  This is appropriate for a
+     // 1280x800 or larger screen with around 1GB RAM.  Values are in KB.
+     private final long[] mOomMinFreeHigh = new long[] {
+             32768, 40960, 49152,
+             57344, 65536, 81920
+     };
++
+     // The actual OOM killer memory levels we are using.
+     private final long[] mOomMinFree = new long[mOomAdj.length];
+ 
+diff --git a/services/java/com/android/server/usb/UsbDeviceManager.java b/services/java/com/android/server/usb/UsbDeviceManager.java
+index 7fd52d9..eca4f67 100644
+--- a/services/java/com/android/server/usb/UsbDeviceManager.java
++++ b/services/java/com/android/server/usb/UsbDeviceManager.java
+@@ -182,10 +182,8 @@ public class UsbDeviceManager {
+         mNotificationManager = (NotificationManager)
+                 mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+ 
+-        // We do not show the USB notification if the primary volume supports mass storage, unless
+-        // persist.sys.usb.config is set to mtp,adb. This will allow the USB notification to show
+-        // on devices with mtp as default and mass storage enabled on primary, so the user can choose
+-        // between mtp, ptp, and mass storage. The legacy mass storage UI will be used otherwise.
++        // We do not show the USB notification if the primary volume supports mass storage.
++        // The legacy mass storage UI will be used instead.
+         boolean massStorageSupported = false;
+         StorageManager storageManager = (StorageManager)
+                 mContext.getSystemService(Context.STORAGE_SERVICE);
+@@ -199,11 +197,7 @@ public class UsbDeviceManager {
+             }
+         }
+ 
+-        if ("mtp,adb".equals(SystemProperties.get("persist.sys.usb.config"))) {
+-            mUseUsbNotification = true;
+-        } else {
+-            mUseUsbNotification = !massStorageSupported;
+-        }
++        mUseUsbNotification = !massStorageSupported;
+ 
+         // make sure the ADB_ENABLED setting value matches the current state
+         Settings.Secure.putInt(mContentResolver, Settings.Secure.ADB_ENABLED, mAdbEnabled ? 1 : 0);
+diff --git a/telephony/java/com/android/internal/telephony/DataCallState.java b/telephony/java/com/android/internal/telephony/DataCallState.java
+index cf4cbbc..a5a5965 100644
+--- a/telephony/java/com/android/internal/telephony/DataCallState.java
++++ b/telephony/java/com/android/internal/telephony/DataCallState.java
+@@ -134,7 +134,7 @@ public class DataCallState {
+                         String [] ap = addr.split("/");
+                         if (ap.length == 2) {
+                             addr = ap[0];
+-                            addrPrefixLen = Integer.parseInt(ap[1].replaceAll("[\\D]",""));
++                            addrPrefixLen = Integer.parseInt(ap[1]);
+                         } else {
+                             addrPrefixLen = 0;
+                         }
+diff --git a/telephony/java/com/android/internal/telephony/JellaxyRIL.java b/telephony/java/com/android/internal/telephony/JellaxyRIL.java
+new file mode 100644
+index 0000000..3d9f550
+--- /dev/null
++++ b/telephony/java/com/android/internal/telephony/JellaxyRIL.java
+@@ -0,0 +1,908 @@
++package com.android.internal.telephony;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import static com.android.internal.telephony.RILConstants.*;
++
++import com.android.internal.telephony.cdma.CdmaInformationRecords;
++import com.android.internal.telephony.cdma.CdmaInformationRecords.CdmaSignalInfoRec;
++import com.android.internal.telephony.cdma.SignalToneUtil;
++
++import android.content.Context;
++import android.content.res.Resources;
++import android.os.Message;
++import android.os.AsyncResult;
++import android.os.Parcel;
++import android.os.SystemProperties;
++import android.util.Log;
++import android.telephony.SmsMessage;
++import android.text.TextUtils;
++
++import android.telephony.PhoneNumberUtils;
++
++
++public class JellaxyRIL extends RIL implements CommandsInterface {
++
++    private boolean mSignalbarCount = SystemProperties.getInt("ro.telephony.sends_barcount", 0) == 1 ? true : false;
++    private boolean mIsSamsungCdma = SystemProperties.getBoolean("ro.ril.samsung_cdma", false);
++
++    public JellaxyRIL(Context context, int networkMode, int cdmaSubscription) {
++        super(context, networkMode, cdmaSubscription);
++    }
++
++    // Gio states
++
++    static final int RIL_UNSOL_DEVICE_READY_NOTI = 11008;
++    static final int RIL_UNSOL_GPS_NOTI = 11009;
++    static final int RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST = 11010;
++    static final int RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST_2 = 11012;
++    static final int RIL_REQUEST_DIAL_EMERGENCY = 10016;
++
++    static String MypdpAddress;
++
++    @Override
++    public void
++    setRadioPower(boolean on, Message result) {
++        RILRequest rr = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, result);
++
++        //samsung crap for airplane mode
++        if (on)
++        {
++            rr.mp.writeInt(1);
++            rr.mp.writeInt(1);
++        } else {
++            rr.mp.writeInt(2);
++            rr.mp.writeInt(0);
++            rr.mp.writeInt(0);
++        }
++        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
++        send(rr);
++    }
++
++    @Override
++    protected void
++    processSolicited (Parcel p) {
++        int serial, error;
++        boolean found = false;
++
++        serial = p.readInt();
++        error = p.readInt();
++
++        RILRequest rr;
++
++        rr = findAndRemoveRequestFromList(serial);
++
++        if (rr == null) {
++            Log.w(LOG_TAG, "Unexpected solicited response! sn: "
++                            + serial + " error: " + error);
++            return;
++        }
++
++        Object ret = null;
++
++        if (error == 0 || p.dataAvail() > 0) {
++            // either command succeeds or command fails but with data payload
++            try {switch (rr.mRequest) {
++            /*
++ cat libs/telephony/ril_commands.h \
++ | egrep "^ *{RIL_" \
++ | sed -re 's/\{([^,]+),[^,]+,([^}]+).+/case \1: ret = \2(p); break;/'
++             */
++            case RIL_REQUEST_GET_SIM_STATUS: ret =  responseIccCardStatus(p); break;
++            case RIL_REQUEST_ENTER_SIM_PIN: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_SIM_PUK: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_SIM_PIN2: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_SIM_PUK2: ret =  responseInts(p); break;
++            case RIL_REQUEST_CHANGE_SIM_PIN: ret =  responseInts(p); break;
++            case RIL_REQUEST_CHANGE_SIM_PIN2: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION: ret =  responseInts(p); break;
++            case RIL_REQUEST_GET_CURRENT_CALLS: ret =  responseCallList(p); break;
++            case RIL_REQUEST_DIAL: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_IMSI: ret =  responseString(p); break;
++            case RIL_REQUEST_HANGUP: ret =  responseVoid(p); break;
++            case RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND: ret =  responseVoid(p); break;
++            case RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CONFERENCE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_UDUB: ret =  responseVoid(p); break;
++            case RIL_REQUEST_LAST_CALL_FAIL_CAUSE: ret =  responseLastCallFailCause(p); break;
++            case RIL_REQUEST_SIGNAL_STRENGTH: ret =  responseSignalStrength(p); break;
++            case RIL_REQUEST_VOICE_REGISTRATION_STATE: ret =  responseVoiceRegistrationState(p); break;
++            case RIL_REQUEST_DATA_REGISTRATION_STATE: ret =  responseStrings(p); break;
++            case RIL_REQUEST_OPERATOR: ret =  responseStrings(p); break;
++            case RIL_REQUEST_RADIO_POWER: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DTMF: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SEND_SMS: ret =  responseSMS(p); break;
++            case RIL_REQUEST_SEND_SMS_EXPECT_MORE: ret =  responseSMS(p); break;
++            case RIL_REQUEST_SETUP_DATA_CALL: ret =  responseSetupDataCall(p); break;
++            case RIL_REQUEST_SIM_IO: ret =  responseICC_IO(p); break;
++            case RIL_REQUEST_SEND_USSD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CANCEL_USSD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_CLIR: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_CLIR: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_CALL_FORWARD_STATUS: ret =  responseCallForward(p); break;
++            case RIL_REQUEST_SET_CALL_FORWARD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_CALL_WAITING: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_CALL_WAITING: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SMS_ACKNOWLEDGE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_IMEI: ret =  responseString(p); break;
++            case RIL_REQUEST_GET_IMEISV: ret =  responseString(p); break;
++            case RIL_REQUEST_ANSWER: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DEACTIVATE_DATA_CALL: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_FACILITY_LOCK: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_FACILITY_LOCK: ret =  responseInts(p); break;
++            case RIL_REQUEST_CHANGE_BARRING_PASSWORD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_AVAILABLE_NETWORKS : ret =  responseOperatorInfos(p); break;
++            case RIL_REQUEST_DTMF_START: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DTMF_STOP: ret =  responseVoid(p); break;
++            case RIL_REQUEST_BASEBAND_VERSION: ret =  responseString(p); break;
++            case RIL_REQUEST_SEPARATE_CONNECTION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_MUTE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_MUTE: ret =  responseInts(p); break;
++            case RIL_REQUEST_QUERY_CLIP: ret =  responseInts(p); break;
++            case RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE: ret =  responseInts(p); break;
++            case RIL_REQUEST_DATA_CALL_LIST: ret =  responseDataCallList(p); break;
++            case RIL_REQUEST_RESET_RADIO: ret =  responseVoid(p); break;
++            case RIL_REQUEST_OEM_HOOK_RAW: ret =  responseRaw(p); break;
++            case RIL_REQUEST_OEM_HOOK_STRINGS: ret =  responseStrings(p); break;
++            case RIL_REQUEST_SCREEN_STATE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_WRITE_SMS_TO_SIM: ret =  responseInts(p); break;
++            case RIL_REQUEST_DELETE_SMS_ON_SIM: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_BAND_MODE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_STK_GET_PROFILE: ret =  responseString(p); break;
++            case RIL_REQUEST_STK_SET_PROFILE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND: ret =  responseString(p); break;
++            case RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM: ret =  responseInts(p); break;
++            case RIL_REQUEST_EXPLICIT_CALL_TRANSFER: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE: ret =  responseNetworkType(p); break;
++            case RIL_REQUEST_GET_NEIGHBORING_CELL_IDS: ret = responseCellList(p); break;
++            case RIL_REQUEST_SET_LOCATION_UPDATES: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_TTY_MODE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_TTY_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_CDMA_FLASH: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_BURST_DTMF: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SEND_SMS: ret =  responseSMS(p); break;
++            case RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GSM_GET_BROADCAST_CONFIG: ret =  responseGmsBroadcastConfig(p); break;
++            case RIL_REQUEST_GSM_SET_BROADCAST_CONFIG: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GSM_BROADCAST_ACTIVATION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG: ret =  responseCdmaBroadcastConfig(p); break;
++            case RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_BROADCAST_ACTIVATION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SUBSCRIPTION: ret =  responseCdmaSubscription(p); break;
++            case RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM: ret =  responseInts(p); break;
++            case RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DEVICE_IDENTITY: ret =  responseStrings(p); break;
++            case RIL_REQUEST_GET_SMSC_ADDRESS: ret = responseString(p); break;
++            case RIL_REQUEST_SET_SMSC_ADDRESS: ret = responseVoid(p); break;
++            case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
++            case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS: ret = responseVoid(p); break;
++            case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: ret = responseVoid(p); break;
++            case RIL_REQUEST_DIAL_EMERGENCY: ret = responseVoid(p); break;
++            default:
++                throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
++            //break;
++            }} catch (Throwable tr) {
++                // Exceptions here usually mean invalid RIL responses
++
++                Log.w(LOG_TAG, rr.serialString() + "< "
++                        + requestToString(rr.mRequest)
++                        + " exception, possible invalid RIL response", tr);
++
++                if (rr.mResult != null) {
++                    AsyncResult.forMessage(rr.mResult, null, tr);
++                    rr.mResult.sendToTarget();
++                }
++                rr.release();
++                return;
++            }
++        }
++
++        if (error != 0) {
++//            rr.onError(error, ret);
++            rr.release();
++            return;
++        }
++
++        if (RILJ_LOGD) riljLog(rr.serialString() + "< " + requestToString(rr.mRequest)
++            + " " + retToString(rr.mRequest, ret));
++
++        if (rr.mResult != null) {
++            AsyncResult.forMessage(rr.mResult, ret, null);
++            rr.mResult.sendToTarget();
++        }
++
++        rr.release();
++    }
++
++    /*@Override
++    protected Object
++    responseOperatorInfos(Parcel p) {
++        String strings[] = (String [])responseStrings(p);
++        ArrayList<OperatorInfo> ret;
++
++        if (strings.length % 5 != 0) {
++            throw new RuntimeException(
++                "RIL_REQUEST_QUERY_AVAILABLE_NETWORKS: invalid response. Got "
++                + strings.length + " strings, expected multible of 5");
++        }
++
++        ret = new ArrayList<OperatorInfo>(strings.length / 5);
++
++        for (int i = 0 ; i < strings.length ; i += 5) {
++            ret.add (
++                new OperatorInfo(
++                    strings[i+0],
++                    strings[i+1],
++                    strings[i+2],
++                    strings[i+3]));
++        }
++
++        return ret;
++    }*/
++
++    protected Object
++    responseIMSI(Parcel p) {
++        String response;
++
++        response = p.readString();
++        if (response.length() > 8)
++            response = response.substring(0, 8);
++
++        return response;
++    }
++
++    @Override
++    protected DataCallState getDataCallState(Parcel p, int version) {
++
++        DataCallState dataCall = new DataCallState();
++
++        dataCall.version = version;
++        dataCall.cid = p.readInt();
++        dataCall.active = p.readInt();
++        dataCall.type = p.readString();
++        p.readString(); // APN - not used
++        String addresses = p.readString();
++
++        if (!TextUtils.isEmpty(addresses)) {
++            dataCall.addresses = addresses.split(" ");
++        } else {
++            dataCall.addresses = new String[] { MypdpAddress };
++        }
++
++        // DataCallState needs an ifname. Since we don't have one use the name from the ThrottleService resource (default=rmnet0).
++        dataCall.ifname = Resources.getSystem().getString(com.android.internal.R.string.config_datause_iface);
++
++        dataCall.gateways  = new String[] {SystemProperties.get("net." + dataCall.ifname + ".gw")};
++        dataCall.dnses     = new String[] {SystemProperties.get("net." + dataCall.ifname + ".dns1"),
++                                           SystemProperties.get("net." + dataCall.ifname + ".dns2")};
++        return dataCall;
++    }
++
++
++
++    @Override
++    protected Object
++    responseDataCallList(Parcel p) {
++        ArrayList<DataCallState> response;
++        int ver = 3;
++        int num = p.readInt();
++        riljLog("responseDataCallList ver=" + ver + " num=" + num);
++
++        response = new ArrayList<DataCallState>(num);
++        for (int i = 0; i < num; i++) {
++            response.add(getDataCallState(p, ver));
++        }
++
++        return response;
++    }
++
++    @Override
++    protected void
++    processUnsolicited (Parcel p) {
++        int response;
++        Object ret;
++
++        response = p.readInt();
++
++        try {switch(response) {
++/*
++ cat libs/telephony/ril_unsol_commands.h \
++ | egrep "^ *{RIL_" \
++ | sed -re 's/\{([^,]+),[^,]+,([^}]+).+/case \1: \2(rr, p); break;/'
++*/
++
++            case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED: ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS: ret =  responseString(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT: ret =  responseString(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM: ret =  responseInts(p); break;
++            case RIL_UNSOL_ON_USSD: ret =  responseStrings(p); break;
++            case RIL_UNSOL_NITZ_TIME_RECEIVED: ret =  responseString(p); break;
++            case RIL_UNSOL_SIGNAL_STRENGTH: ret = responseSignalStrength(p); break;
++            case RIL_UNSOL_DATA_CALL_LIST_CHANGED: ret = responseDataCallList(p);break;
++            case RIL_UNSOL_SUPP_SVC_NOTIFICATION: ret = responseSuppServiceNotification(p); break;
++            case RIL_UNSOL_STK_SESSION_END: ret = responseVoid(p); break;
++            case RIL_UNSOL_STK_PROACTIVE_COMMAND: ret = responseString(p); break;
++            case RIL_UNSOL_STK_EVENT_NOTIFY: ret = responseString(p); break;
++            case RIL_UNSOL_STK_CALL_SETUP: ret = responseInts(p); break;
++            case RIL_UNSOL_SIM_SMS_STORAGE_FULL: ret =  responseVoid(p); break;
++            case RIL_UNSOL_SIM_REFRESH: ret =  responseInts(p); break;
++            case RIL_UNSOL_CALL_RING: ret =  responseCallRing(p); break;
++            case RIL_UNSOL_RESTRICTED_STATE_CHANGED: ret = responseInts(p); break;
++            case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:  ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:  ret =  responseCdmaSms(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:  ret =  responseRaw(p); break;
++            case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:  ret =  responseVoid(p); break;
++            case RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
++            case RIL_UNSOL_CDMA_CALL_WAITING: ret = responseCdmaCallWaiting(p); break;
++            case RIL_UNSOL_CDMA_OTA_PROVISION_STATUS: ret = responseInts(p); break;
++            case RIL_UNSOL_CDMA_INFO_REC: ret = responseCdmaInformationRecord(p); break;
++            case RIL_UNSOL_OEM_HOOK_RAW: ret = responseRaw(p); break;
++            case RIL_UNSOL_RINGBACK_TONE: ret = responseInts(p); break;
++            case RIL_UNSOL_RESEND_INCALL_MUTE: ret = responseVoid(p); break;
++            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret = responseInts(p); break;
++            case RIL_UNSOL_CDMA_PRL_CHANGED: ret = responseInts(p); break;
++            case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
++            case RIL_UNSOL_RIL_CONNECTED: ret = responseInts(p); break;
++
++            // unknown responses 
++            case RIL_UNSOL_DEVICE_READY_NOTI: ret = responseVoid(p); break;
++            case RIL_UNSOL_GPS_NOTI: ret = responseVoid(p); break;
++            case RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST: ret = responseVoid(p); break;
++            case RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST_2: ret = responseVoid(p); break;
++
++            default:
++                throw new RuntimeException("Unrecognized unsol response: " + response);
++            //break; (implied)
++        }} catch (Throwable tr) {
++            Log.e(LOG_TAG, "Exception processing unsol response: " + response +
++                "Exception:" + tr.toString());
++            return;
++        }
++
++        switch(response) {
++            case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
++                /* has bonus radio state int */
++                RadioState newState = getRadioStateFromInt(p.readInt());
++                if (RILJ_LOGD) unsljLogMore(response, newState.toString());
++
++                switchToRadioState(newState);
++            break;
++            case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
++                if (RILJ_LOGD) unsljLog(response);
++
++                mCallStateRegistrants
++                    .notifyRegistrants(new AsyncResult(null, null, null));
++            break;
++            case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED:
++                if (RILJ_LOGD) unsljLog(response);
++
++                mVoiceNetworkStateRegistrants
++                    .notifyRegistrants(new AsyncResult(null, null, null));
++            break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS: {
++                if (RILJ_LOGD) unsljLog(response);
++
++                // FIXME this should move up a layer
++                String a[] = new String[2];
++
++                a[1] = (String)ret;
++
++                SmsMessage sms;
++
++                sms = SmsMessage.newFromCMT(a);
++                if (mGsmSmsRegistrant != null) {
++                    mGsmSmsRegistrant
++                        .notifyRegistrant(new AsyncResult(null, sms, null));
++                }
++            break;
++            }
++            case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mSmsStatusRegistrant != null) {
++                    mSmsStatusRegistrant.notifyRegistrant(
++                            new AsyncResult(null, ret, null));
++                }
++            break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                int[] smsIndex = (int[])ret;
++
++                if(smsIndex.length == 1) {
++                    if (mSmsOnSimRegistrant != null) {
++                        mSmsOnSimRegistrant.
++                                notifyRegistrant(new AsyncResult(null, smsIndex, null));
++                    }
++                } else {
++                    if (RILJ_LOGD) riljLog(" NEW_SMS_ON_SIM ERROR with wrong length "
++                            + smsIndex.length);
++                }
++            break;
++            case RIL_UNSOL_ON_USSD:
++                String[] resp = (String[])ret;
++
++                if (resp.length < 2) {
++                    resp = new String[2];
++                    resp[0] = ((String[])ret)[0];
++                    resp[1] = null;
++                }
++                if (RILJ_LOGD) unsljLogMore(response, resp[0]);
++                if (mUSSDRegistrant != null) {
++                    mUSSDRegistrant.notifyRegistrant(
++                        new AsyncResult (null, resp, null));
++                }
++            break;
++            case RIL_UNSOL_NITZ_TIME_RECEIVED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                // has bonus long containing milliseconds since boot that the NITZ
++                // time was received
++                long nitzReceiveTime = p.readLong();
++
++                Object[] result = new Object[2];
++
++                result[0] = ret;
++                result[1] = Long.valueOf(nitzReceiveTime);
++
++                if (mNITZTimeRegistrant != null) {
++
++                    mNITZTimeRegistrant
++                        .notifyRegistrant(new AsyncResult (null, result, null));
++                } else {
++                    // in case NITZ time registrant isnt registered yet
++                    mLastNITZTimeInfo = result;
++                }
++            break;
++
++            case RIL_UNSOL_SIGNAL_STRENGTH:
++                // Note this is set to "verbose" because it happens
++                // frequently
++                if (RILJ_LOGV) unsljLogvRet(response, ret);
++
++                if (mSignalStrengthRegistrant != null) {
++                    mSignalStrengthRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++            break;
++            case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                boolean oldRil = needsOldRilFeature("skipbrokendatacall");
++                if (oldRil && "IP".equals(((ArrayList<DataCallState>)ret).get(0).type))
++                    break;
++
++                mDataNetworkStateRegistrants.notifyRegistrants(new AsyncResult(null, ret, null));
++            break;
++
++            case RIL_UNSOL_SUPP_SVC_NOTIFICATION:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mSsnRegistrant != null) {
++                    mSsnRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_SESSION_END:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mCatSessionEndRegistrant != null) {
++                    mCatSessionEndRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_PROACTIVE_COMMAND:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCatProCmdRegistrant != null) {
++                    mCatProCmdRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_EVENT_NOTIFY:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCatEventRegistrant != null) {
++                    mCatEventRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_CALL_SETUP:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCatCallSetUpRegistrant != null) {
++                    mCatCallSetUpRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_SIM_SMS_STORAGE_FULL:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mIccSmsFullRegistrant != null) {
++                    mIccSmsFullRegistrant.notifyRegistrant();
++                }
++                break;
++
++            case RIL_UNSOL_SIM_REFRESH:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mIccRefreshRegistrants != null) {
++                    mIccRefreshRegistrants.notifyRegistrants(
++                            new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CALL_RING:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mRingRegistrant != null) {
++                    mRingRegistrant.notifyRegistrant(
++                            new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESTRICTED_STATE_CHANGED:
++                if (RILJ_LOGD) unsljLogvRet(response, ret);
++                if (mRestrictedStateRegistrant != null) {
++                    mRestrictedStateRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mIccStatusChangedRegistrants != null) {
++                    mIccStatusChangedRegistrants.notifyRegistrants();
++                }
++                break;
++
++            case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:
++                if (RILJ_LOGD) unsljLog(response);
++
++                SmsMessage sms = (SmsMessage) ret;
++
++                if (mCdmaSmsRegistrant != null) {
++                    mCdmaSmsRegistrant
++                        .notifyRegistrant(new AsyncResult(null, sms, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mGsmBroadcastSmsRegistrant != null) {
++                    mGsmBroadcastSmsRegistrant
++                        .notifyRegistrant(new AsyncResult(null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mIccSmsFullRegistrant != null) {
++                    mIccSmsFullRegistrant.notifyRegistrant();
++                }
++                break;
++
++            case RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mEmergencyCallbackModeRegistrant != null) {
++                    mEmergencyCallbackModeRegistrant.notifyRegistrant();
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_CALL_WAITING:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCallWaitingInfoRegistrants != null) {
++                    mCallWaitingInfoRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_OTA_PROVISION_STATUS:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mOtaProvisionRegistrants != null) {
++                    mOtaProvisionRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_INFO_REC:
++                ArrayList<CdmaInformationRecords> listInfoRecs;
++
++                try {
++                    listInfoRecs = (ArrayList<CdmaInformationRecords>)ret;
++                } catch (ClassCastException e) {
++                    Log.e(LOG_TAG, "Unexpected exception casting to listInfoRecs", e);
++                    break;
++                }
++
++                for (CdmaInformationRecords rec : listInfoRecs) {
++                    if (RILJ_LOGD) unsljLogRet(response, rec);
++                    notifyRegistrantsCdmaInfoRec(rec);
++                }
++                break;
++
++            case RIL_UNSOL_OEM_HOOK_RAW:
++                if (RILJ_LOGD) unsljLogvRet(response, IccUtils.bytesToHexString((byte[])ret));
++                if (mUnsolOemHookRawRegistrant != null) {
++                    mUnsolOemHookRawRegistrant.notifyRegistrant(new AsyncResult(null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_RINGBACK_TONE:
++                if (RILJ_LOGD) unsljLogvRet(response, ret);
++                if (mRingbackToneRegistrants != null) {
++                    boolean playtone = (((int[])ret)[0] == 1);
++                    mRingbackToneRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, playtone, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESEND_INCALL_MUTE:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mResendIncallMuteRegistrants != null) {
++                    mResendIncallMuteRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCdmaSubscriptionChangedRegistrants != null) {
++                    mCdmaSubscriptionChangedRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_PRL_CHANGED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCdmaPrlChangedRegistrants != null) {
++                    mCdmaPrlChangedRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mExitEmergencyCallbackModeRegistrants != null) {
++                    mExitEmergencyCallbackModeRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, null, null));
++                }
++                break;
++
++            case RIL_UNSOL_RIL_CONNECTED: {
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                // Initial conditions
++                setRadioPower(false, null);
++                setPreferredNetworkType(mPreferredNetworkType, null);
++                setCdmaSubscriptionSource(mCdmaSubscription, null);
++                notifyRegistrantsRilConnectionChanged(((int[])ret)[0]);
++                break;
++            }
++        }
++    }
++
++    /**
++     * Notifiy all registrants that the ril has connected or disconnected.
++     *
++     * @param rilVer is the version of the ril or -1 if disconnected.
++     */
++    private void notifyRegistrantsRilConnectionChanged(int rilVer) {
++        mRilVersion = rilVer;
++        if (mRilConnectedRegistrants != null) {
++            mRilConnectedRegistrants.notifyRegistrants(
++                                new AsyncResult (null, new Integer(rilVer), null));
++        }
++    }
++
++    @Override
++    protected Object
++    responseCallList(Parcel p) {
++        int num;
++        int voiceSettings;
++        ArrayList<DriverCall> response;
++        DriverCall dc;
++        int dataAvail = p.dataAvail();
++        int pos = p.dataPosition();
++        int size = p.dataSize();
++
++        Log.d(LOG_TAG, "Parcel size = " + size);
++        Log.d(LOG_TAG, "Parcel pos = " + pos);
++        Log.d(LOG_TAG, "Parcel dataAvail = " + dataAvail);
++
++        //Samsung fucked up here
++
++        num = p.readInt();
++
++        Log.d(LOG_TAG, "num = " + num);
++        response = new ArrayList<DriverCall>(num);
++
++        for (int i = 0 ; i < num ; i++) {
++
++            dc = new DriverCall();
++
++            dc.state = DriverCall.stateFromCLCC(p.readInt());
++            Log.d(LOG_TAG, "state = " + dc.state);
++            dc.index = p.readInt();
++            Log.d(LOG_TAG, "index = " + dc.index);
++            dc.TOA = p.readInt();
++            Log.d(LOG_TAG, "state = " + dc.TOA);
++            dc.isMpty = (0 != p.readInt());
++            Log.d(LOG_TAG, "isMpty = " + dc.isMpty);
++            dc.isMT = (0 != p.readInt());
++            Log.d(LOG_TAG, "isMT = " + dc.isMT);
++            dc.als = p.readInt();
++            Log.d(LOG_TAG, "als = " + dc.als);
++            voiceSettings = p.readInt();
++            dc.isVoice = (0 == voiceSettings) ? false : true;
++            Log.d(LOG_TAG, "isVoice = " + dc.isVoice);
++            dc.isVoicePrivacy =  (0 != p.readInt());
++            dc.number = p.readString();
++            Log.d(LOG_TAG, "number = " + dc.number);
++            int np = p.readInt();
++            Log.d(LOG_TAG, "np = " + np);
++            dc.numberPresentation = DriverCall.presentationFromCLIP(np);
++            dc.name = p.readString();
++            Log.d(LOG_TAG, "name = " + dc.name);
++            dc.namePresentation = p.readInt();
++            Log.d(LOG_TAG, "namePresentation = " + dc.namePresentation);
++
++            // Make sure there's a leading + on addresses with a TOA of 145
++            dc.number = PhoneNumberUtils.stringFromStringAndTOA(dc.number, dc.TOA);
++
++            response.add(dc);
++
++            if (dc.isVoicePrivacy) {
++                mVoicePrivacyOnRegistrants.notifyRegistrants();
++                Log.d(LOG_TAG, "InCall VoicePrivacy is enabled");
++            } else {
++                mVoicePrivacyOffRegistrants.notifyRegistrants();
++                Log.d(LOG_TAG, "InCall VoicePrivacy is disabled");
++            }
++        }
++
++        Collections.sort(response);
++
++        return response;
++    }
++ 
++   protected Object
++    responseLastCallFailCause(Parcel p) {
++        int response[] = (int[])responseInts(p);
++
++        if (mIsSamsungCdma && response.length > 0 &&
++            response[0] == com.android.internal.telephony.cdma.CallFailCause.ERROR_UNSPECIFIED) {
++
++            // Far-end hangup returns ERROR_UNSPECIFIED, which shows "Call Lost" dialog.
++            Log.d(LOG_TAG, "Overriding ERROR_UNSPECIFIED fail cause with NORMAL_CLEARING.");
++            response[0] = com.android.internal.telephony.cdma.CallFailCause.NORMAL_CLEARING;
++        }
++
++        return response;
++    }
++
++    @Override
++    protected Object
++    responseSignalStrength(Parcel p) {
++        // When SIM is PIN-unlocked, the RIL responds with APPSTATE_UNKNOWN and
++        // does not follow up with RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED. We
++        // notify the system here.
++        String state = SystemProperties.get(TelephonyProperties.PROPERTY_SIM_STATE);
++        if ("NOT_READY".equals(state) && mIccStatusChangedRegistrants != null) {
++            mIccStatusChangedRegistrants.notifyRegistrants();
++        }
++
++        int numInts = 12;
++        int response[];
++
++        /* TODO: Add SignalStrength class to match RIL_SignalStrength */
++        response = new int[numInts];
++        for (int i = 0 ; i < 7 ; i++) {
++            response[i] = p.readInt();
++        }
++        // SamsungRIL is a v3 RIL, fill the rest with -1
++        for (int i = 7; i < numInts; i++) {
++            response[i] = -1;
++        }
++
++        if (mIsSamsungCdma){
++            if(response[3] < 0){
++               response[3] = -response[3];
++            }
++            // Framework takes care of the rest for us.
++            return response;
++         }
++        /* Matching Samsung signal strength to asu.
++		   Method taken from Samsungs cdma/gsmSignalStateTracker */
++        if(mSignalbarCount)
++        {
++            // Samsung sends the count of bars that should be displayed instead of
++            // a real signal strength
++            response[0] = ((response[0] & 0xFF00) >> 8) * 3; // gsmDbm
++        } else {
++            response[0] = response[0] & 0xFF; // gsmDbm
++        }
++        response[1] = -1; // gsmEcio
++        response[2] = (response[2] < 0)?-120:-response[2]; // cdmaDbm
++        response[3] = (response[3] < 0)?-160:-response[3]; // cdmaEcio
++        response[4] = (response[4] < 0)?-120:-response[4]; // evdoRssi
++        response[5] = (response[5] < 0)?-1:-response[5]; // evdoEcio
++        if(response[6] < 0 || response[6] > 8)
++            response[6] = -1;
++
++        return response;
++    }
++
++    protected Object
++    responseVoiceRegistrationState(Parcel p) {
++        String response[] = (String[])responseStrings(p);
++
++        if (mIsSamsungCdma && response.length > 6) {
++            // These values are provided in hex, convert to dec.
++            response[4] = Integer.toString(Integer.parseInt(response[4], 16)); // baseStationId
++            response[5] = Integer.toString(Integer.parseInt(response[5], 16)); // baseStationLatitude
++            response[6] = Integer.toString(Integer.parseInt(response[6], 16)); // baseStationLongitude
++        }
++
++        return response;
++   }
++
++    protected Object
++    responseCdmaSubscription(Parcel p) {
++        String response[] = (String[])responseStrings(p);
++
++        if (/* mIsSamsungCdma && */ response.length == 4) {
++            // PRL version is missing in subscription parcel, add it from properties.
++            String prlVersion = SystemProperties.get("ril.prl_ver_1").split(":")[1];
++            response          = new String[] {response[0], response[1], response[2],
++                                              response[3], prlVersion};
++        }
++
++        return response;
++    }
++
++    protected Object
++    responseNetworkType(Parcel p) {
++        int response[] = (int[]) responseInts(p);
++
++        // When the modem responds Phone.NT_MODE_GLOBAL, it means Phone.NT_MODE_WCDMA_PREF
++        if (!mIsSamsungCdma && response[0] == Phone.NT_MODE_GLOBAL) {
++            Log.d(LOG_TAG, "Overriding network type response from global to WCDMA preferred");
++            response[0] = Phone.NT_MODE_WCDMA_PREF;
++        }
++
++        return response;
++    }
++
++}
+diff --git a/telephony/java/com/android/internal/telephony/PhoneProxy.java b/telephony/java/com/android/internal/telephony/PhoneProxy.java
+index aa21012..d2f40ed 100644
+--- a/telephony/java/com/android/internal/telephony/PhoneProxy.java
++++ b/telephony/java/com/android/internal/telephony/PhoneProxy.java
+@@ -135,9 +135,9 @@ public class PhoneProxy extends Handler implements Phone {
+     private void updatePhoneObject(int newVoiceRadioTech) {
+ 
+         if (mActivePhone != null) {
+-            if(mRilVersion >= 6 && getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) {
++            if(mRilVersion == 6 && getLteOnCdmaMode() == Phone.LTE_ON_CDMA_TRUE) {
+                 /*
+-                 * On v6 or greater RIL, when LTE_ON_CDMA is TRUE, always create CDMALTEPhone
++                 * On v6 RIL, when LTE_ON_CDMA is TRUE, always create CDMALTEPhone
+                  * irrespective of the voice radio tech reported.
+                  */
+                 if (mActivePhone.getPhoneType() == PHONE_TYPE_CDMA) {
+diff --git a/telephony/java/com/android/internal/telephony/RIL.java b/telephony/java/com/android/internal/telephony/RIL.java
+index ce3ad40..98c5c82 100644
+--- a/telephony/java/com/android/internal/telephony/RIL.java
++++ b/telephony/java/com/android/internal/telephony/RIL.java
+@@ -579,20 +579,6 @@ public class RIL extends BaseCommands implements CommandsInterface {
+                 mSocket = s;
+                 Log.i(LOG_TAG, "Connected to '" + SOCKET_NAME_RIL + "' socket");
+ 
+-                /* Compatibility with qcom's DSDS (Dual SIM) stack */
+-                if (needsOldRilFeature("qcomdsds")) {
+-                    String str = "SUB1";
+-                    byte[] data = str.getBytes();
+-                    try {
+-                        mSocket.getOutputStream().write(data);
+-                        Log.i(LOG_TAG, "Data sent!!");
+-                    } catch (IOException ex) {
+-                            Log.e(LOG_TAG, "IOException", ex);
+-                    } catch (RuntimeException exc) {
+-                        Log.e(LOG_TAG, "Uncaught exception ", exc);
+-                    }
+-                }
+-
+                 int length = 0;
+                 try {
+                     InputStream is = mSocket.getInputStream();
+diff --git a/telephony/java/com/android/internal/telephony/SamsungMSMRIL.java b/telephony/java/com/android/internal/telephony/SamsungMSMRIL.java
+new file mode 100644
+index 0000000..fb42ae7
+--- /dev/null
++++ b/telephony/java/com/android/internal/telephony/SamsungMSMRIL.java
+@@ -0,0 +1,111 @@
++/*
++ * Copyright (C) 2012 The CyanogenMod Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.internal.telephony;
++
++import static com.android.internal.telephony.RILConstants.*;
++
++import android.content.Context;
++import android.os.Parcel;
++import android.os.AsyncResult;
++import android.util.Log;
++import com.android.internal.telephony.RILConstants;
++
++/**
++ * Custom RIL to handle unique behavior of Samsung's MSM7X30 devices radio
++ *
++ * {@hide}
++ */
++public class SamsungMSMRIL extends RIL implements CommandsInterface {
++
++    public SamsungMSMRIL(Context context, int networkMode, int cdmaSubscription) {
++        super(context, networkMode, cdmaSubscription);
++    }
++
++    @Override
++    protected void
++    processUnsolicited (Parcel p) {
++        Object ret;
++        int dataPosition = p.dataPosition();   // save off position within the Parcel
++        int response     = p.readInt();
++
++        switch(response) {
++            case RIL_UNSOL_NITZ_TIME_RECEIVED:
++                handleNitzTimeReceived(p);
++                return;
++
++            default:
++                // Rewind the Parcel
++                p.setDataPosition(dataPosition);
++
++                // Forward responses that we are not overriding to the super class
++                super.processUnsolicited(p);
++                return;
++        }
++    }
++
++    protected void
++    handleNitzTimeReceived(Parcel p) {
++        String nitz = (String)responseString(p);
++        if (RILJ_LOGD) unsljLogRet(RIL_UNSOL_NITZ_TIME_RECEIVED, nitz);
++
++        // has bonus long containing milliseconds since boot that the NITZ
++        // time was received
++        long nitzReceiveTime = p.readLong();
++
++        Object[] result = new Object[2];
++
++        String fixedNitz = nitz;
++        String[] nitzParts = nitz.split(",");
++        if (nitzParts.length == 4) {
++            // 0=date, 1=time+zone, 2=dst, 3=garbage that confuses GsmServiceStateTracker (so remove it)
++            fixedNitz = nitzParts[0]+","+nitzParts[1]+","+nitzParts[2]+",";
++        }
++
++        result[0] = fixedNitz;
++        result[1] = Long.valueOf(nitzReceiveTime);
++
++        if (mNITZTimeRegistrant != null) {
++
++            mNITZTimeRegistrant
++                .notifyRegistrant(new AsyncResult (null, result, null));
++        } else {
++            // in case NITZ time registrant isnt registered yet
++            mLastNITZTimeInfo = result;
++        }
++    }
++
++    @Override
++    protected Object
++    responseSignalStrength(Parcel p) {
++        int numInts = 12;
++        int response[];
++
++        /* TODO: Add SignalStrength class to match RIL_SignalStrength */
++        response = new int[numInts];
++        for (int i = 0 ; i < 7 ; i++) {
++            response[i] = p.readInt();
++        }
++        // SamsungRIL is a v3 RIL, fill the rest with -1
++        for (int i = 7; i < numInts; i++) {
++            response[i] = -1;
++        }
++
++        response[0] = response[0] & 0xFF; // gsmDbm
++
++        return response;
++    }
++}
+diff --git a/telephony/java/com/android/internal/telephony/Smdk4210RIL.java b/telephony/java/com/android/internal/telephony/Smdk4210RIL.java
+index fbab8bf..e826238 100644
+--- a/telephony/java/com/android/internal/telephony/Smdk4210RIL.java
++++ b/telephony/java/com/android/internal/telephony/Smdk4210RIL.java
+@@ -161,14 +161,6 @@ public class Smdk4210RIL extends RIL implements CommandsInterface {
+         mQANElements = 5;
+     }
+ 
+-    static String
+-    requestToString(int request) {
+-        switch (request) {
+-            case RIL_REQUEST_DIAL_EMERGENCY: return "DIAL_EMERGENCY";
+-            default: return RIL.requestToString(request);
+-        }
+-    }
+-
+     @Override
+     public void setCurrentPreferredNetworkType() {
+         if (RILJ_LOGD) riljLog("setCurrentPreferredNetworkType IGNORED");
+@@ -504,7 +496,6 @@ public class Smdk4210RIL extends RIL implements CommandsInterface {
+             case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU: ret = responseVoid(p); break;
+             case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS: ret = responseICC_IO(p); break;
+             case RIL_REQUEST_VOICE_RADIO_TECH: ret = responseInts(p); break;
+-            case RIL_REQUEST_DIAL_EMERGENCY: ret = responseVoid(p); break;
+             default:
+                 throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
+                 //break;
+@@ -558,50 +549,6 @@ public class Smdk4210RIL extends RIL implements CommandsInterface {
+     }
+ 
+     @Override
+-    public void
+-    dial(String address, int clirMode, UUSInfo uusInfo, Message result) {
+-        RILRequest rr;
+-        if (PhoneNumberUtils.isEmergencyNumber(address)) {
+-            dialEmergencyCall(address, clirMode, result);
+-            return;
+-        }
+-
+-        rr = RILRequest.obtain(RIL_REQUEST_DIAL, result);
+-        rr.mp.writeString(address);
+-        rr.mp.writeInt(clirMode);
+-        rr.mp.writeInt(0); // UUS information is absent
+-
+-        if (uusInfo == null) {
+-            rr.mp.writeInt(0); // UUS information is absent
+-        } else {
+-            rr.mp.writeInt(1); // UUS information is present
+-            rr.mp.writeInt(uusInfo.getType());
+-            rr.mp.writeInt(uusInfo.getDcs());
+-            rr.mp.writeByteArray(uusInfo.getUserData());
+-        }
+-
+-        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+-
+-        send(rr);
+-    }
+-
+-    public void
+-    dialEmergencyCall(String address, int clirMode, Message result) {
+-        RILRequest rr;
+-        Log.v(LOG_TAG, "Emergency dial: " + address);
+-
+-        rr = RILRequest.obtain(RIL_REQUEST_DIAL_EMERGENCY, result);
+-        rr.mp.writeString(address + "/");
+-        rr.mp.writeInt(clirMode);
+-        rr.mp.writeInt(0);
+-        rr.mp.writeInt(0);
+-
+-        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+-
+-        send(rr);
+-    }
+-
+-    @Override
+     protected void
+     processUnsolicited (Parcel p) {
+         Object ret;
+diff --git a/telephony/java/com/android/internal/telephony/SonyQualcommRIL.java b/telephony/java/com/android/internal/telephony/SonyQualcommRIL.java
+index 3f58bae..102d608 100644
+--- a/telephony/java/com/android/internal/telephony/SonyQualcommRIL.java
++++ b/telephony/java/com/android/internal/telephony/SonyQualcommRIL.java
+@@ -234,9 +234,7 @@ public class SonyQualcommRIL extends QualcommSharedRIL implements CommandsInterf
+             rr.mp.writeInt(uusInfo.getDcs());
+             rr.mp.writeByteArray(uusInfo.getUserData());
+         }
+-
+-        if (!needsOldRilFeature("qcomdsds"))
+-            rr.mp.writeInt(255);
++        rr.mp.writeInt(255);
+ 
+         if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
+ 
+@@ -248,7 +246,7 @@ public class SonyQualcommRIL extends QualcommSharedRIL implements CommandsInterf
+         RILRequest rr;
+ 
+         if (operatorNumeric == null)
+-            rr = RILRequest.obtain(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC, response);
++           rr = RILRequest.obtain(RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC, response);
+         else
+             rr = RILRequest.obtain(RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL, response);
+ 
+diff --git a/telephony/java/com/android/internal/telephony/TassRIL.java b/telephony/java/com/android/internal/telephony/TassRIL.java
+new file mode 100644
+index 0000000..daa6a2c
+--- /dev/null
++++ b/telephony/java/com/android/internal/telephony/TassRIL.java
+@@ -0,0 +1,830 @@
++/*
++ * Copyright (C) 2006 The Android Open Source Project
++ * Copyright (C) 2012 Dāvis Mālnieks (TheWhisp)
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.internal.telephony;
++
++import java.util.ArrayList;
++import java.util.Collections;
++import static com.android.internal.telephony.RILConstants.*;
++
++import com.android.internal.telephony.cdma.CdmaInformationRecords;
++
++import android.content.Context;
++import android.content.res.Resources;
++import android.os.Message;
++import android.os.AsyncResult;
++import android.os.Parcel;
++import android.os.SystemProperties;
++import android.util.Log;
++import android.telephony.SmsMessage;
++import android.text.TextUtils;
++
++import android.telephony.PhoneNumberUtils;
++
++
++public class TassRIL extends RIL implements CommandsInterface {
++
++    private boolean mSignalbarCount = SystemProperties.getInt("ro.telephony.sends_barcount", 0) == 1 ? true : false;
++    private boolean mIsSamsungCdma = SystemProperties.getBoolean("ro.ril.samsung_cdma", false);
++
++    public TassRIL(Context context, int networkMode, int cdmaSubscription) {
++        super(context, networkMode, cdmaSubscription);
++    }
++
++    // states
++
++    static final int RIL_UNSOL_DEVICE_READY_NOTI = 11008;
++    static final int RIL_UNSOL_GPS_NOTI = 11009;
++    static final int RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST = 11010;
++    static final int RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST_2 = 11012;
++
++    static String MypdpAddress;
++
++    @Override
++    public void
++    setRadioPower(boolean on, Message result) {
++        RILRequest rr = RILRequest.obtain(RIL_REQUEST_RADIO_POWER, result);
++
++        //samsung crap for airplane mode
++        if (on)
++        {
++            rr.mp.writeInt(1);
++            rr.mp.writeInt(1);
++        } else {
++            rr.mp.writeInt(2);
++            rr.mp.writeInt(0);
++            rr.mp.writeInt(0);
++        }
++        if (RILJ_LOGD) riljLog(rr.serialString() + "> " + requestToString(rr.mRequest));
++        send(rr);
++    }
++
++    @Override
++    protected void
++    processSolicited (Parcel p) {
++        int serial, error;
++        boolean found = false;
++
++        serial = p.readInt();
++        error = p.readInt();
++
++        RILRequest rr;
++
++        rr = findAndRemoveRequestFromList(serial);
++
++        if (rr == null) {
++            Log.w(LOG_TAG, "Unexpected solicited response! sn: "
++                            + serial + " error: " + error);
++            return;
++        }
++
++        Object ret = null;
++
++        if (error == 0 || p.dataAvail() > 0) {
++            // either command succeeds or command fails but with data payload
++            try {switch (rr.mRequest) {
++            /*
++ cat libs/telephony/ril_commands.h \
++ | egrep "^ *{RIL_" \
++ | sed -re 's/\{([^,]+),[^,]+,([^}]+).+/case \1: ret = \2(p); break;/'
++             */
++            case RIL_REQUEST_GET_SIM_STATUS: ret =  responseIccCardStatus(p); break;
++            case RIL_REQUEST_ENTER_SIM_PIN: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_SIM_PUK: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_SIM_PIN2: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_SIM_PUK2: ret =  responseInts(p); break;
++            case RIL_REQUEST_CHANGE_SIM_PIN: ret =  responseInts(p); break;
++            case RIL_REQUEST_CHANGE_SIM_PIN2: ret =  responseInts(p); break;
++            case RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION: ret =  responseInts(p); break;
++            case RIL_REQUEST_GET_CURRENT_CALLS: ret =  responseCallList(p); break;
++            case RIL_REQUEST_DIAL: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_IMSI: ret =  responseIMSI(p); break;
++            case RIL_REQUEST_HANGUP: ret =  responseVoid(p); break;
++            case RIL_REQUEST_HANGUP_WAITING_OR_BACKGROUND: ret =  responseVoid(p); break;
++            case RIL_REQUEST_HANGUP_FOREGROUND_RESUME_BACKGROUND: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SWITCH_WAITING_OR_HOLDING_AND_ACTIVE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CONFERENCE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_UDUB: ret =  responseVoid(p); break;
++            case RIL_REQUEST_LAST_CALL_FAIL_CAUSE: ret =  responseInts(p); break;
++            case RIL_REQUEST_SIGNAL_STRENGTH: ret =  responseSignalStrength(p); break;
++            case RIL_REQUEST_VOICE_REGISTRATION_STATE: ret =  responseStrings(p); break;
++            case RIL_REQUEST_DATA_REGISTRATION_STATE: ret =  responseStrings(p); break;
++            case RIL_REQUEST_OPERATOR: ret =  responseStrings(p); break;
++            case RIL_REQUEST_RADIO_POWER: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DTMF: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SEND_SMS: ret =  responseSMS(p); break;
++            case RIL_REQUEST_SEND_SMS_EXPECT_MORE: ret =  responseSMS(p); break;
++            case RIL_REQUEST_SETUP_DATA_CALL: ret =  responseSetupDataCall(p); break;
++            case RIL_REQUEST_SIM_IO: ret =  responseICC_IO(p); break;
++            case RIL_REQUEST_SEND_USSD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CANCEL_USSD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_CLIR: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_CLIR: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_CALL_FORWARD_STATUS: ret =  responseCallForward(p); break;
++            case RIL_REQUEST_SET_CALL_FORWARD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_CALL_WAITING: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_CALL_WAITING: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SMS_ACKNOWLEDGE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_IMEI: ret =  responseString(p); break;
++            case RIL_REQUEST_GET_IMEISV: ret =  responseString(p); break;
++            case RIL_REQUEST_ANSWER: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DEACTIVATE_DATA_CALL: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_FACILITY_LOCK: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_FACILITY_LOCK: ret =  responseInts(p); break;
++            case RIL_REQUEST_CHANGE_BARRING_PASSWORD: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_NETWORK_SELECTION_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_NETWORK_SELECTION_AUTOMATIC: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_NETWORK_SELECTION_MANUAL: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_AVAILABLE_NETWORKS : ret =  responseOperatorInfos(p); break;
++            case RIL_REQUEST_DTMF_START: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DTMF_STOP: ret =  responseVoid(p); break;
++            case RIL_REQUEST_BASEBAND_VERSION: ret =  responseString(p); break;
++            case RIL_REQUEST_SEPARATE_CONNECTION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_MUTE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_MUTE: ret =  responseInts(p); break;
++            case RIL_REQUEST_QUERY_CLIP: ret =  responseInts(p); break;
++            case RIL_REQUEST_LAST_DATA_CALL_FAIL_CAUSE: ret =  responseInts(p); break;
++            case RIL_REQUEST_DATA_CALL_LIST: ret =  responseDataCallList(p); break;
++            case RIL_REQUEST_RESET_RADIO: ret =  responseVoid(p); break;
++            case RIL_REQUEST_OEM_HOOK_RAW: ret =  responseRaw(p); break;
++            case RIL_REQUEST_OEM_HOOK_STRINGS: ret =  responseStrings(p); break;
++            case RIL_REQUEST_SCREEN_STATE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_SUPP_SVC_NOTIFICATION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_WRITE_SMS_TO_SIM: ret =  responseInts(p); break;
++            case RIL_REQUEST_DELETE_SMS_ON_SIM: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_BAND_MODE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_AVAILABLE_BAND_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_STK_GET_PROFILE: ret =  responseString(p); break;
++            case RIL_REQUEST_STK_SET_PROFILE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND: ret =  responseString(p); break;
++            case RIL_REQUEST_STK_SEND_TERMINAL_RESPONSE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_STK_HANDLE_CALL_SETUP_REQUESTED_FROM_SIM: ret =  responseInts(p); break;
++            case RIL_REQUEST_EXPLICIT_CALL_TRANSFER: ret =  responseVoid(p); break;
++            case RIL_REQUEST_SET_PREFERRED_NETWORK_TYPE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GET_PREFERRED_NETWORK_TYPE: ret =  responseGetPreferredNetworkType(p); break;
++            case RIL_REQUEST_GET_NEIGHBORING_CELL_IDS: ret = responseCellList(p); break;
++            case RIL_REQUEST_SET_LOCATION_UPDATES: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SET_SUBSCRIPTION_SOURCE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SET_ROAMING_PREFERENCE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_QUERY_ROAMING_PREFERENCE: ret =  responseInts(p); break;
++            case RIL_REQUEST_SET_TTY_MODE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_QUERY_TTY_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_CDMA_SET_PREFERRED_VOICE_PRIVACY_MODE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_QUERY_PREFERRED_VOICE_PRIVACY_MODE: ret =  responseInts(p); break;
++            case RIL_REQUEST_CDMA_FLASH: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_BURST_DTMF: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SEND_SMS: ret =  responseSMS(p); break;
++            case RIL_REQUEST_CDMA_SMS_ACKNOWLEDGE: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GSM_GET_BROADCAST_CONFIG: ret =  responseGmsBroadcastConfig(p); break;
++            case RIL_REQUEST_GSM_SET_BROADCAST_CONFIG: ret =  responseVoid(p); break;
++            case RIL_REQUEST_GSM_BROADCAST_ACTIVATION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_GET_BROADCAST_CONFIG: ret =  responseCdmaBroadcastConfig(p); break;
++            case RIL_REQUEST_CDMA_SET_BROADCAST_CONFIG: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_BROADCAST_ACTIVATION: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_VALIDATE_AND_WRITE_AKEY: ret =  responseVoid(p); break;
++            case RIL_REQUEST_CDMA_SUBSCRIPTION: ret =  responseStrings(p); break;
++            case RIL_REQUEST_CDMA_WRITE_SMS_TO_RUIM: ret =  responseInts(p); break;
++            case RIL_REQUEST_CDMA_DELETE_SMS_ON_RUIM: ret =  responseVoid(p); break;
++            case RIL_REQUEST_DEVICE_IDENTITY: ret =  responseStrings(p); break;
++            case RIL_REQUEST_GET_SMSC_ADDRESS: ret = responseString(p); break;
++            case RIL_REQUEST_SET_SMSC_ADDRESS: ret = responseVoid(p); break;
++            case RIL_REQUEST_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
++            case RIL_REQUEST_REPORT_SMS_MEMORY_STATUS: ret = responseVoid(p); break;
++            case RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING: ret = responseVoid(p); break;
++            case RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE: ret =  responseInts(p); break;
++            case RIL_REQUEST_ISIM_AUTHENTICATION: ret =  responseString(p); break;
++            case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU: ret = responseVoid(p); break;
++            case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS: ret = responseICC_IO(p); break;
++
++            default:
++                throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
++            //break;
++            }} catch (Throwable tr) {
++                // Exceptions here usually mean invalid RIL responses
++
++                Log.w(LOG_TAG, rr.serialString() + "< "
++                        + requestToString(rr.mRequest)
++                        + " exception, possible invalid RIL response", tr);
++
++                if (rr.mResult != null) {
++                    AsyncResult.forMessage(rr.mResult, null, tr);
++                    rr.mResult.sendToTarget();
++                }
++                rr.release();
++                return;
++            }
++        }
++
++        if (error != 0) {
++            //rr.onError(error, ret);
++            rr.release();
++            return;
++        }
++
++        if (RILJ_LOGD) riljLog(rr.serialString() + "< " + requestToString(rr.mRequest)
++            + " " + retToString(rr.mRequest, ret));
++
++        if (rr.mResult != null) {
++            AsyncResult.forMessage(rr.mResult, ret, null);
++            rr.mResult.sendToTarget();
++        }
++
++        rr.release();
++    }
++
++    protected Object
++    responseIMSI(Parcel p) {
++        String response;
++
++        response = p.readString();
++        if (response.length() > 8)
++            response = response.substring(0, 8);
++
++        return response;
++    }
++
++    @Override
++    protected DataCallState getDataCallState(Parcel p, int version) {
++
++        DataCallState dataCall = new DataCallState();
++
++        dataCall.version = version;
++        dataCall.cid = p.readInt();
++        dataCall.active = p.readInt();
++        dataCall.type = p.readString();
++        p.readString(); // APN - not used
++        String addresses = p.readString();
++
++        if (!TextUtils.isEmpty(addresses)) {
++            dataCall.addresses = addresses.split(" ");
++        } else {
++            dataCall.addresses = new String[] { MypdpAddress };
++        }
++
++        // DataCallState needs an ifname. Since we don't have one use the name from the ThrottleService resource (default=rmnet0).
++        dataCall.ifname = Resources.getSystem().getString(com.android.internal.R.string.config_datause_iface);
++
++        dataCall.gateways  = new String[] {SystemProperties.get("net." + dataCall.ifname + ".gw")};
++        dataCall.dnses     = new String[] {SystemProperties.get("net." + dataCall.ifname + ".dns1"),
++                                           SystemProperties.get("net." + dataCall.ifname + ".dns2")};
++        return dataCall;
++    }
++
++
++
++    @Override
++    protected Object
++    responseDataCallList(Parcel p) {
++        ArrayList<DataCallState> response;
++        int ver = 3;
++        int num = p.readInt();
++        riljLog("responseDataCallList ver=" + ver + " num=" + num);
++
++        response = new ArrayList<DataCallState>(num);
++        for (int i = 0; i < num; i++) {
++            response.add(getDataCallState(p, ver));
++        }
++
++        return response;
++    }
++
++    @Override
++    protected void
++    processUnsolicited (Parcel p) {
++        int response;
++        Object ret;
++
++        response = p.readInt();
++
++        try {switch(response) {
++/*
++ cat libs/telephony/ril_unsol_commands.h \
++ | egrep "^ *{RIL_" \
++ | sed -re 's/\{([^,]+),[^,]+,([^}]+).+/case \1: \2(rr, p); break;/'
++*/
++
++            case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED: ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED: ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS: ret =  responseString(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT: ret =  responseString(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM: ret =  responseInts(p); break;
++            case RIL_UNSOL_ON_USSD: ret =  responseStrings(p); break;
++            case RIL_UNSOL_NITZ_TIME_RECEIVED: ret =  responseString(p); break;
++            case RIL_UNSOL_SIGNAL_STRENGTH: ret = responseSignalStrength(p); break;
++            case RIL_UNSOL_DATA_CALL_LIST_CHANGED: ret = responseDataCallList(p);break;
++            case RIL_UNSOL_SUPP_SVC_NOTIFICATION: ret = responseSuppServiceNotification(p); break;
++            case RIL_UNSOL_STK_SESSION_END: ret = responseVoid(p); break;
++            case RIL_UNSOL_STK_PROACTIVE_COMMAND: ret = responseString(p); break;
++            case RIL_UNSOL_STK_EVENT_NOTIFY: ret = responseString(p); break;
++            case RIL_UNSOL_STK_CALL_SETUP: ret = responseInts(p); break;
++            case RIL_UNSOL_SIM_SMS_STORAGE_FULL: ret =  responseVoid(p); break;
++            case RIL_UNSOL_SIM_REFRESH: ret =  responseInts(p); break;
++            case RIL_UNSOL_CALL_RING: ret =  responseCallRing(p); break;
++            case RIL_UNSOL_RESTRICTED_STATE_CHANGED: ret = responseInts(p); break;
++            case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:  ret =  responseVoid(p); break;
++            case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:  ret =  responseCdmaSms(p); break;
++            case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:  ret =  responseRaw(p); break;
++            case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:  ret =  responseVoid(p); break;
++            case RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
++            case RIL_UNSOL_CDMA_CALL_WAITING: ret = responseCdmaCallWaiting(p); break;
++            case RIL_UNSOL_CDMA_OTA_PROVISION_STATUS: ret = responseInts(p); break;
++            case RIL_UNSOL_CDMA_INFO_REC: ret = responseCdmaInformationRecord(p); break;
++            case RIL_UNSOL_OEM_HOOK_RAW: ret = responseRaw(p); break;
++            case RIL_UNSOL_RINGBACK_TONE: ret = responseInts(p); break;
++            case RIL_UNSOL_RESEND_INCALL_MUTE: ret = responseVoid(p); break;
++            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED: ret = responseInts(p); break;
++            case RIL_UNSOL_CDMA_PRL_CHANGED: ret = responseInts(p); break;
++            case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE: ret = responseVoid(p); break;
++            case RIL_UNSOL_RIL_CONNECTED: ret = responseInts(p); break;
++
++            // unknown responses 
++            case RIL_UNSOL_DEVICE_READY_NOTI: ret = responseVoid(p); break;
++            case RIL_UNSOL_GPS_NOTI: ret = responseVoid(p); break;
++            case RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST: ret = responseVoid(p); break;
++            case RIL_UNSOL_SAMSUNG_UNKNOWN_MAGIC_REQUEST_2: ret = responseVoid(p); break;
++
++            default:
++                throw new RuntimeException("Unrecognized unsol response: " + response);
++            //break; (implied)
++        }} catch (Throwable tr) {
++            Log.e(LOG_TAG, "Exception processing unsol response: " + response +
++                "Exception:" + tr.toString());
++            return;
++        }
++
++        switch(response) {
++            case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED:
++                /* has bonus radio state int */
++                RadioState newState = getRadioStateFromInt(p.readInt());
++                if (RILJ_LOGD) unsljLogMore(response, newState.toString());
++
++                switchToRadioState(newState);
++            break;
++            case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED:
++                if (RILJ_LOGD) unsljLog(response);
++
++                mCallStateRegistrants
++                    .notifyRegistrants(new AsyncResult(null, null, null));
++            break;
++            case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED:
++                if (RILJ_LOGD) unsljLog(response);
++
++                mVoiceNetworkStateRegistrants
++                    .notifyRegistrants(new AsyncResult(null, null, null));
++            break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS: {
++                if (RILJ_LOGD) unsljLog(response);
++
++                // FIXME this should move up a layer
++                String a[] = new String[2];
++
++                a[1] = (String)ret;
++
++                SmsMessage sms;
++
++                sms = SmsMessage.newFromCMT(a);
++                if (mGsmSmsRegistrant != null) {
++                    mGsmSmsRegistrant
++                        .notifyRegistrant(new AsyncResult(null, sms, null));
++                }
++            break;
++            }
++            case RIL_UNSOL_RESPONSE_NEW_SMS_STATUS_REPORT:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mSmsStatusRegistrant != null) {
++                    mSmsStatusRegistrant.notifyRegistrant(
++                            new AsyncResult(null, ret, null));
++                }
++            break;
++            case RIL_UNSOL_RESPONSE_NEW_SMS_ON_SIM:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                int[] smsIndex = (int[])ret;
++
++                if(smsIndex.length == 1) {
++                    if (mSmsOnSimRegistrant != null) {
++                        mSmsOnSimRegistrant.
++                                notifyRegistrant(new AsyncResult(null, smsIndex, null));
++                    }
++                } else {
++                    if (RILJ_LOGD) riljLog(" NEW_SMS_ON_SIM ERROR with wrong length "
++                            + smsIndex.length);
++                }
++            break;
++            case RIL_UNSOL_ON_USSD:
++                String[] resp = (String[])ret;
++
++                if (resp.length < 2) {
++                    resp = new String[2];
++                    resp[0] = ((String[])ret)[0];
++                    resp[1] = null;
++                }
++                if (RILJ_LOGD) unsljLogMore(response, resp[0]);
++                if (mUSSDRegistrant != null) {
++                    mUSSDRegistrant.notifyRegistrant(
++                        new AsyncResult (null, resp, null));
++                }
++            break;
++            case RIL_UNSOL_NITZ_TIME_RECEIVED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                // has bonus long containing milliseconds since boot that the NITZ
++                // time was received
++                long nitzReceiveTime = p.readLong();
++
++                Object[] result = new Object[2];
++
++                result[0] = ret;
++                result[1] = Long.valueOf(nitzReceiveTime);
++
++                if (mNITZTimeRegistrant != null) {
++
++                    mNITZTimeRegistrant
++                        .notifyRegistrant(new AsyncResult (null, result, null));
++                } else {
++                    // in case NITZ time registrant isnt registered yet
++                    mLastNITZTimeInfo = result;
++                }
++            break;
++		// Thewhisp edit
++           case RIL_UNSOL_SIGNAL_STRENGTH:
++           	if (RILJ_LOGV) unsljLogvRet(response, ret);
++
++		if (mSignalStrengthRegistrant != null) {
++                    mSignalStrengthRegistrant.notifyRegistrant(
++                    	    new AsyncResult (null, ret, null));
++            }
++            break;
++		// end of TheWhisp edit
++            case RIL_UNSOL_DATA_CALL_LIST_CHANGED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                boolean oldRil = needsOldRilFeature("skipbrokendatacall");
++                if (oldRil && "IP".equals(((ArrayList<DataCallState>)ret).get(0).type))
++                    break;
++
++                mDataNetworkStateRegistrants.notifyRegistrants(new AsyncResult(null, ret, null));
++            break;
++
++            case RIL_UNSOL_SUPP_SVC_NOTIFICATION:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mSsnRegistrant != null) {
++                    mSsnRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_SESSION_END:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mCatSessionEndRegistrant != null) {
++                    mCatSessionEndRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_PROACTIVE_COMMAND:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCatProCmdRegistrant != null) {
++                    mCatProCmdRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_EVENT_NOTIFY:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCatEventRegistrant != null) {
++                    mCatEventRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_STK_CALL_SETUP:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCatCallSetUpRegistrant != null) {
++                    mCatCallSetUpRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_SIM_SMS_STORAGE_FULL:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mIccSmsFullRegistrant != null) {
++                    mIccSmsFullRegistrant.notifyRegistrant();
++                }
++                break;
++
++            case RIL_UNSOL_SIM_REFRESH:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mIccRefreshRegistrants != null) {
++                    mIccRefreshRegistrants.notifyRegistrants(
++                            new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CALL_RING:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mRingRegistrant != null) {
++                    mRingRegistrant.notifyRegistrant(
++                            new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESTRICTED_STATE_CHANGED:
++                if (RILJ_LOGD) unsljLogvRet(response, ret);
++                if (mRestrictedStateRegistrant != null) {
++                    mRestrictedStateRegistrant.notifyRegistrant(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESPONSE_SIM_STATUS_CHANGED:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mIccStatusChangedRegistrants != null) {
++                    mIccStatusChangedRegistrants.notifyRegistrants();
++                }
++                break;
++
++            case RIL_UNSOL_RESPONSE_CDMA_NEW_SMS:
++                if (RILJ_LOGD) unsljLog(response);
++
++                SmsMessage sms = (SmsMessage) ret;
++
++                if (mCdmaSmsRegistrant != null) {
++                    mCdmaSmsRegistrant
++                        .notifyRegistrant(new AsyncResult(null, sms, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESPONSE_NEW_BROADCAST_SMS:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mGsmBroadcastSmsRegistrant != null) {
++                    mGsmBroadcastSmsRegistrant
++                        .notifyRegistrant(new AsyncResult(null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_RUIM_SMS_STORAGE_FULL:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mIccSmsFullRegistrant != null) {
++                    mIccSmsFullRegistrant.notifyRegistrant();
++                }
++                break;
++
++            case RIL_UNSOL_ENTER_EMERGENCY_CALLBACK_MODE:
++                if (RILJ_LOGD) unsljLog(response);
++
++                if (mEmergencyCallbackModeRegistrant != null) {
++                    mEmergencyCallbackModeRegistrant.notifyRegistrant();
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_CALL_WAITING:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCallWaitingInfoRegistrants != null) {
++                    mCallWaitingInfoRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_OTA_PROVISION_STATUS:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mOtaProvisionRegistrants != null) {
++                    mOtaProvisionRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_INFO_REC:
++                ArrayList<CdmaInformationRecords> listInfoRecs;
++
++                try {
++                    listInfoRecs = (ArrayList<CdmaInformationRecords>)ret;
++                } catch (ClassCastException e) {
++                    Log.e(LOG_TAG, "Unexpected exception casting to listInfoRecs", e);
++                    break;
++                }
++
++                for (CdmaInformationRecords rec : listInfoRecs) {
++                    if (RILJ_LOGD) unsljLogRet(response, rec);
++                    notifyRegistrantsCdmaInfoRec(rec);
++                }
++                break;
++
++            case RIL_UNSOL_OEM_HOOK_RAW:
++                if (RILJ_LOGD) unsljLogvRet(response, IccUtils.bytesToHexString((byte[])ret));
++                if (mUnsolOemHookRawRegistrant != null) {
++                    mUnsolOemHookRawRegistrant.notifyRegistrant(new AsyncResult(null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_RINGBACK_TONE:
++                if (RILJ_LOGD) unsljLogvRet(response, ret);
++                if (mRingbackToneRegistrants != null) {
++                    boolean playtone = (((int[])ret)[0] == 1);
++                    mRingbackToneRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, playtone, null));
++                }
++                break;
++
++            case RIL_UNSOL_RESEND_INCALL_MUTE:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mResendIncallMuteRegistrants != null) {
++                    mResendIncallMuteRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_SUBSCRIPTION_SOURCE_CHANGED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCdmaSubscriptionChangedRegistrants != null) {
++                    mCdmaSubscriptionChangedRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_CDMA_PRL_CHANGED:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mCdmaPrlChangedRegistrants != null) {
++                    mCdmaPrlChangedRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, ret, null));
++                }
++                break;
++
++            case RIL_UNSOL_EXIT_EMERGENCY_CALLBACK_MODE:
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                if (mExitEmergencyCallbackModeRegistrants != null) {
++                    mExitEmergencyCallbackModeRegistrants.notifyRegistrants(
++                                        new AsyncResult (null, null, null));
++                }
++                break;
++
++            case RIL_UNSOL_RIL_CONNECTED: {
++                if (RILJ_LOGD) unsljLogRet(response, ret);
++
++                // Initial conditions
++                setRadioPower(false, null);
++                setPreferredNetworkType(mPreferredNetworkType, null);
++                setCdmaSubscriptionSource(mCdmaSubscription, null);
++                notifyRegistrantsRilConnectionChanged(((int[])ret)[0]);
++                break;
++            }
++        }
++    }
++
++    /**
++     * Notifiy all registrants that the ril has connected or disconnected.
++     *
++     * @param rilVer is the version of the ril or -1 if disconnected.
++     */
++    private void notifyRegistrantsRilConnectionChanged(int rilVer) {
++        mRilVersion = rilVer;
++        if (mRilConnectedRegistrants != null) {
++            mRilConnectedRegistrants.notifyRegistrants(
++                                new AsyncResult (null, new Integer(rilVer), null));
++        }
++    }
++	// TheWhisp edit
++	@Override
++    protected Object
++    responseSignalStrength(Parcel p) {
++        int numInts = 12;
++        int response[];
++
++        response = new int[numInts];
++		
++		if("SPH-D710".equals(SystemProperties.get("ro.product.device"))){
++			for(int i = 0 ; i < numInts ; i++){
++				response[i] = p.readInt();
++			}
++
++			return response;
++		}
++		
++        for (int i = 0 ; i < 7 ; i++) {
++            response[i] = p.readInt();
++        }
++        for (int i = 7; i < numInts; i++) {
++            response[i] = -1;
++        }
++	
++        if(mSignalbarCount) {   
++            response[0] = ((response[0] & 0xFF00) >> 8) * 3; // gsmDbm
++        } else {
++            response[0] = response[0] & 0xFF; // gsmDbm
++        }
++        response[1] = -1; // gsmEcio
++        response[2] = (response[2] < 0)?-120:-response[2]; // cdmaDbm
++        response[3] = (response[3] < 0)?-160:-response[3]; // cdmaEcio
++        response[4] = (response[4] < 0)?-120:-response[4]; // evdoRssi
++        response[5] = (response[5] < 0)?-1:-response[5]; // evdoEcio
++        if(response[6] < 0 || response[6] > 8)
++            response[6] = -1;
++
++        return response;
++    }
++	// end of TheWhisp edit
++
++    @Override
++    protected Object
++    responseCallList(Parcel p) {
++        int num;
++        int voiceSettings;
++        ArrayList<DriverCall> response;
++        DriverCall dc;
++        int dataAvail = p.dataAvail();
++        int pos = p.dataPosition();
++        int size = p.dataSize();
++
++        Log.d(LOG_TAG, "Parcel size = " + size);
++        Log.d(LOG_TAG, "Parcel pos = " + pos);
++        Log.d(LOG_TAG, "Parcel dataAvail = " + dataAvail);
++
++        //Samsung fucked up here
++
++        num = p.readInt();
++
++        Log.d(LOG_TAG, "num = " + num);
++        response = new ArrayList<DriverCall>(num);
++
++        for (int i = 0 ; i < num ; i++) {
++
++            dc = new DriverCall();
++
++            dc.state = DriverCall.stateFromCLCC(p.readInt());
++            Log.d(LOG_TAG, "state = " + dc.state);
++            dc.index = p.readInt();
++            Log.d(LOG_TAG, "index = " + dc.index);
++            dc.TOA = p.readInt();
++            Log.d(LOG_TAG, "state = " + dc.TOA);
++            dc.isMpty = (0 != p.readInt());
++            Log.d(LOG_TAG, "isMpty = " + dc.isMpty);
++            dc.isMT = (0 != p.readInt());
++            Log.d(LOG_TAG, "isMT = " + dc.isMT);
++            dc.als = p.readInt();
++            Log.d(LOG_TAG, "als = " + dc.als);
++            voiceSettings = p.readInt();
++            dc.isVoice = (0 == voiceSettings) ? false : true;
++            Log.d(LOG_TAG, "isVoice = " + dc.isVoice);
++            dc.isVoicePrivacy =  (0 != p.readInt());
++            dc.number = p.readString();
++            Log.d(LOG_TAG, "number = " + dc.number);
++            int np = p.readInt();
++            Log.d(LOG_TAG, "np = " + np);
++            dc.numberPresentation = DriverCall.presentationFromCLIP(np);
++            dc.name = p.readString();
++            Log.d(LOG_TAG, "name = " + dc.name);
++            dc.namePresentation = p.readInt();
++            Log.d(LOG_TAG, "namePresentation = " + dc.namePresentation);
++
++            // Make sure there's a leading + on addresses with a TOA of 145
++            dc.number = PhoneNumberUtils.stringFromStringAndTOA(dc.number, dc.TOA);
++
++            response.add(dc);
++
++            if (dc.isVoicePrivacy) {
++                mVoicePrivacyOnRegistrants.notifyRegistrants();
++                Log.d(LOG_TAG, "InCall VoicePrivacy is enabled");
++            } else {
++                mVoicePrivacyOffRegistrants.notifyRegistrants();
++                Log.d(LOG_TAG, "InCall VoicePrivacy is disabled");
++            }
++        }
++
++        Collections.sort(response);
++
++        return response;
++    }
++}
+diff --git a/telephony/java/com/android/internal/telephony/gsm/GsmDataConnectionTracker.java b/telephony/java/com/android/internal/telephony/gsm/GsmDataConnectionTracker.java
+index 4e151bf..6d47d03 100644
+--- a/telephony/java/com/android/internal/telephony/gsm/GsmDataConnectionTracker.java
++++ b/telephony/java/com/android/internal/telephony/gsm/GsmDataConnectionTracker.java
+@@ -625,7 +625,7 @@ public final class GsmDataConnectionTracker extends DataConnectionTracker {
+             // update APN availability so that APN can be enabled.
+             notifyOffApnsOfAvailability(Phone.REASON_DATA_ATTACHED);
+         }
+-        mAutoAttachOnCreation = true;
++
+         setupDataOnReadyApns(Phone.REASON_DATA_ATTACHED);
+     }
+ 
+-- 
+2.1.0
+

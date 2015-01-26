@@ -1,0 +1,2451 @@
+From 071ac2374db0df742c0e34f4784071f8862785f1 Mon Sep 17 00:00:00 2001
+From: streambinder <davidepucci@hiddenhost.org>
+Date: Mon, 26 Jan 2015 17:09:07 +0100
+Subject: [PATCH] system/netd: unified patch
+
+---
+ Android.mk                 |  26 ++--
+ BandwidthController.cpp    |  35 +----
+ BandwidthController.h      |   6 +
+ CommandListener.cpp        | 327 +++++++++++++++++++++++++++++++++++----------
+ CommandListener.h          |  23 ++--
+ DnsProxyListener.cpp       |   7 +-
+ DnsProxyListener.h         |   3 -
+ FirewallController.cpp     | 149 +++++++++++++++++++++
+ FirewallController.h       |  56 ++++++++
+ IdletimerController.cpp    | 111 +++++++++------
+ IdletimerController.h      |  12 +-
+ InterfaceController.cpp    | 101 ++++++++++++++
+ InterfaceController.h      |  44 ++++++
+ NatController.cpp          |  27 +---
+ NatController.h            |   3 +
+ NetdConstants.cpp          |  74 ++++++++++
+ NetdConstants.h            |  10 ++
+ NetlinkHandler.cpp         |  19 ++-
+ NetlinkHandler.h           |   2 +-
+ NetlinkManager.h           |   1 -
+ ResolverController.cpp     |   2 +-
+ ResponseCode.h             |   4 +-
+ SecondaryTableController.h |   2 +-
+ SoftapController.cpp       | 302 +++++++++++------------------------------
+ SoftapController.h         |   2 -
+ TetherController.cpp       |  82 +++++++++++-
+ TetherController.h         |   6 +-
+ logwrapper.c               |  18 ++-
+ ndc.c                      |  31 +++--
+ oem_iptables_hook.cpp      |  40 +-----
+ oem_iptables_hook.h        |   4 +
+ 31 files changed, 1032 insertions(+), 497 deletions(-)
+ create mode 100644 FirewallController.cpp
+ create mode 100644 FirewallController.h
+ create mode 100644 InterfaceController.cpp
+ create mode 100644 InterfaceController.h
+
+diff --git a/Android.mk b/Android.mk
+index 95939df..857d963 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -6,14 +6,15 @@ LOCAL_SRC_FILES:=                                      \
+                   BandwidthController.cpp              \
+                   CommandListener.cpp                  \
+                   DnsProxyListener.cpp                 \
+-                  MDnsSdListener.cpp                   \
++                  FirewallController.cpp               \
+                   IdletimerController.cpp              \
++                  InterfaceController.cpp              \
++                  MDnsSdListener.cpp                   \
+                   NatController.cpp                    \
+                   NetdCommand.cpp                      \
+                   NetdConstants.cpp                    \
+                   NetlinkHandler.cpp                   \
+                   NetlinkManager.cpp                   \
+-                  PanController.cpp                    \
+                   PppController.cpp                    \
+                   ResolverController.cpp               \
+                   SecondaryTableController.cpp         \
+@@ -27,8 +28,6 @@ LOCAL_SRC_FILES:=                                      \
+ LOCAL_MODULE:= netd
+ 
+ LOCAL_C_INCLUDES := $(KERNEL_HEADERS) \
+-                    $(LOCAL_PATH)/../bluetooth/bluedroid/include \
+-                    $(LOCAL_PATH)/../bluetooth/bluez-clean-headers \
+                     external/mdnsresponder/mDNSShared \
+                     external/openssl/include \
+                     external/stlport/stlport \
+@@ -39,17 +38,14 @@ LOCAL_C_INCLUDES := $(KERNEL_HEADERS) \
+ LOCAL_CFLAGS := -Werror=format
+ 
+ LOCAL_SHARED_LIBRARIES := libstlport libsysutils libcutils libnetutils \
+-                          libcrypto libhardware_legacy libmdnssd
++                          libcrypto libhardware_legacy libmdnssd libdl
+ 
+-ifeq ($(BOARD_TI_SOFTAP),true)
+-  LOCAL_SRC_FILES += SoftapControllerTI.cpp
+-else
+-ifeq ($(USES_TI_MAC80211),true)
++ifdef USES_TI_MAC80211
+   LOCAL_SRC_FILES += SoftapControllerTI.cpp
+ else
+   LOCAL_SRC_FILES += SoftapController.cpp
+ endif
+-endif
++
+ 
+ ifneq ($(BOARD_HOSTAPD_DRIVER),)
+   LOCAL_CFLAGS += -DHAVE_HOSTAPD
+@@ -62,13 +58,17 @@ ifneq ($(BOARD_HOSTAPD_NO_ENTROPY),)
+   LOCAL_CFLAGS += -DHOSTAPD_NO_ENTROPY
+ endif
+ 
++ifeq ($(BOARD_HAVE_LEGACY_HOSTAPD),true)
++  LOCAL_CFLAGS += -DHAVE_LEGACY_HOSTAPD
++endif
++
+ ifeq ($(BOARD_HAVE_BLUETOOTH),true)
+   LOCAL_SHARED_LIBRARIES := $(LOCAL_SHARED_LIBRARIES) libbluedroid
+-  LOCAL_CFLAGS := $(LOCAL_CFLAGS) -DHAVE_BLUETOOTH
++  LOCAL_CFLAGS += -DHAVE_BLUETOOTH
+ endif
+ 
+-ifeq ($(WIFI_DRIVER_HAS_LGE_SOFTAP),true)
+-  LOCAL_CFLAGS += -DLGE_SOFTAP
++ifeq ($(BOARD_WLAN_NO_FWRELOAD),true)
++  LOCAL_CFLAGS += -DWLAN_NO_FWRELOAD
+ endif
+ 
+ include $(BUILD_EXECUTABLE)
+diff --git a/BandwidthController.cpp b/BandwidthController.cpp
+index 3b0c2ac..e5d3054 100644
+--- a/BandwidthController.cpp
++++ b/BandwidthController.cpp
+@@ -51,6 +51,11 @@ extern "C" int system_nosh(const char *command);
+ #define ALERT_IPT_TEMPLATE "%s %s %s -m quota2 ! --quota %lld --name %s"
+ const int  BandwidthController::ALERT_RULE_POS_IN_COSTLY_CHAIN = 4;
+ const char BandwidthController::ALERT_GLOBAL_NAME[] = "globalAlert";
++const char* BandwidthController::LOCAL_INPUT = "bw_INPUT";
++const char* BandwidthController::LOCAL_FORWARD = "bw_FORWARD";
++const char* BandwidthController::LOCAL_OUTPUT = "bw_OUTPUT";
++const char* BandwidthController::LOCAL_RAW_PREROUTING = "bw_raw_PREROUTING";
++const char* BandwidthController::LOCAL_MANGLE_POSTROUTING = "bw_mangle_POSTROUTING";
+ const int  BandwidthController::MAX_CMD_ARGS = 32;
+ const int  BandwidthController::MAX_CMD_LEN = 1024;
+ const int  BandwidthController::MAX_IFACENAME_LEN = 64;
+@@ -113,42 +118,13 @@ const char *BandwidthController::IPT_FLUSH_COMMANDS[] = {
+ 
+ /* The cleanup commands assume flushing has been done. */
+ const char *BandwidthController::IPT_CLEANUP_COMMANDS[] = {
+-    /* Delete hooks to custom chains. */
+-    "-D INPUT -j bw_INPUT",
+-    "-D OUTPUT -j bw_OUTPUT",
+-    "-D FORWARD -j bw_FORWARD",
+-
+-    "-t raw -D bw_raw_PREROUTING",
+-    "-t mangle -D bw_mangle_POSTROUTING",
+-
+-    "-X bw_INPUT",
+-    "-X bw_OUTPUT",
+-    "-X bw_FORWARD",
+     "-X penalty_box",
+     "-X costly_shared",
+-
+-    "-t raw -X bw_raw_PREROUTING",
+-    "-t mangle -X bw_mangle_POSTROUTING",
+ };
+ 
+ const char *BandwidthController::IPT_SETUP_COMMANDS[] = {
+-    /* Created needed chains. */
+-    "-N bw_INPUT",
+-    "-I INPUT -j bw_INPUT",
+-
+-    "-N bw_OUTPUT",
+-    "-I OUTPUT -j bw_OUTPUT",
+-
+-    "-N bw_FORWARD",
+-    "-I FORWARD -j bw_FORWARD",
+-
+     "-N costly_shared",
+     "-N penalty_box",
+-
+-    "-t raw -N bw_raw_PREROUTING",
+-    "-t raw -A PREROUTING -j bw_raw_PREROUTING",
+-    "-t mangle -N bw_mangle_POSTROUTING",
+-    "-t mangle -A POSTROUTING -j bw_mangle_POSTROUTING",
+ };
+ 
+ const char *BandwidthController::IPT_BASIC_ACCOUNTING_COMMANDS[] = {
+@@ -253,7 +229,6 @@ int BandwidthController::setupIptablesHooks(void) {
+             IPT_SETUP_COMMANDS, RunCmdFailureBad);
+ 
+     return 0;
+-
+ }
+ 
+ int BandwidthController::enableBandwidthControl(bool force) {
+diff --git a/BandwidthController.h b/BandwidthController.h
+index 10e6ca2..17017d2 100644
+--- a/BandwidthController.h
++++ b/BandwidthController.h
+@@ -80,6 +80,12 @@ public:
+      */
+     int getTetherStats(TetherStats &stats, std::string &extraProcessingInfo);
+ 
++    static const char* LOCAL_INPUT;
++    static const char* LOCAL_FORWARD;
++    static const char* LOCAL_OUTPUT;
++    static const char* LOCAL_RAW_PREROUTING;
++    static const char* LOCAL_MANGLE_POSTROUTING;
++
+ protected:
+     class QuotaInfo {
+     public:
+diff --git a/CommandListener.cpp b/CommandListener.cpp
+index 386c95d..047a417 100644
+--- a/CommandListener.cpp
++++ b/CommandListener.cpp
+@@ -40,17 +40,88 @@
+ #include "IdletimerController.h"
+ #include "SecondaryTableController.h"
+ #include "oem_iptables_hook.h"
+-
++#include "NetdConstants.h"
++#include "FirewallController.h"
+ 
+ TetherController *CommandListener::sTetherCtrl = NULL;
+ NatController *CommandListener::sNatCtrl = NULL;
+ PppController *CommandListener::sPppCtrl = NULL;
+-PanController *CommandListener::sPanCtrl = NULL;
+ SoftapController *CommandListener::sSoftapCtrl = NULL;
+ BandwidthController * CommandListener::sBandwidthCtrl = NULL;
+ IdletimerController * CommandListener::sIdletimerCtrl = NULL;
++InterfaceController *CommandListener::sInterfaceCtrl = NULL;
+ ResolverController *CommandListener::sResolverCtrl = NULL;
+ SecondaryTableController *CommandListener::sSecondaryTableCtrl = NULL;
++FirewallController *CommandListener::sFirewallCtrl = NULL;
++
++/**
++ * List of module chains to be created, along with explicit ordering. ORDERING
++ * IS CRITICAL, AND SHOULD BE TRIPLE-CHECKED WITH EACH CHANGE.
++ */
++static const char* FILTER_INPUT[] = {
++        // Bandwidth should always be early in input chain, to make sure we
++        // correctly count incoming traffic against data plan.
++        BandwidthController::LOCAL_INPUT,
++        FirewallController::LOCAL_INPUT,
++        NULL,
++};
++
++static const char* FILTER_FORWARD[] = {
++        OEM_IPTABLES_FILTER_FORWARD,
++        FirewallController::LOCAL_FORWARD,
++        BandwidthController::LOCAL_FORWARD,
++        NatController::LOCAL_FORWARD,
++        NULL,
++};
++
++static const char* FILTER_OUTPUT[] = {
++        OEM_IPTABLES_FILTER_OUTPUT,
++        FirewallController::LOCAL_OUTPUT,
++        BandwidthController::LOCAL_OUTPUT,
++        NULL,
++};
++
++static const char* RAW_PREROUTING[] = {
++        BandwidthController::LOCAL_RAW_PREROUTING,
++        IdletimerController::LOCAL_RAW_PREROUTING,
++        NULL,
++};
++
++static const char* MANGLE_POSTROUTING[] = {
++        BandwidthController::LOCAL_MANGLE_POSTROUTING,
++        IdletimerController::LOCAL_MANGLE_POSTROUTING,
++        NULL,
++};
++
++static const char* NAT_PREROUTING[] = {
++        OEM_IPTABLES_NAT_PREROUTING,
++        NULL,
++};
++
++static const char* NAT_POSTROUTING[] = {
++        NatController::LOCAL_NAT_POSTROUTING,
++        NULL,
++};
++
++static void createChildChains(IptablesTarget target, const char* table, const char* parentChain,
++        const char** childChains) {
++    const char** childChain = childChains;
++    do {
++        // Order is important:
++        // -D to delete any pre-existing jump rule (removes references
++        //    that would prevent -X from working)
++        // -F to flush any existing chain
++        // -X to delete any existing chain
++        // -N to create the chain
++        // -A to append the chain to parent
++
++        execIptablesSilently(target, "-t", table, "-D", parentChain, "-j", *childChain, NULL);
++        execIptablesSilently(target, "-t", table, "-F", *childChain, NULL);
++        execIptablesSilently(target, "-t", table, "-X", *childChain, NULL);
++        execIptables(target, "-t", table, "-N", *childChain, NULL);
++        execIptables(target, "-t", table, "-A", parentChain, "-j", *childChain, NULL);
++    } while (*(++childChain) != NULL);
++}
+ 
+ CommandListener::CommandListener() :
+                  FrameworkListener("netd", true) {
+@@ -60,11 +131,11 @@ CommandListener::CommandListener() :
+     registerCmd(new NatCmd());
+     registerCmd(new ListTtysCmd());
+     registerCmd(new PppdCmd());
+-    registerCmd(new PanCmd());
+     registerCmd(new SoftapCmd());
+     registerCmd(new BandwidthControlCmd());
+     registerCmd(new IdletimerControlCmd());
+     registerCmd(new ResolverCmd());
++    registerCmd(new FirewallCmd());
+ 
+     if (!sSecondaryTableCtrl)
+         sSecondaryTableCtrl = new SecondaryTableController();
+@@ -74,8 +145,6 @@ CommandListener::CommandListener() :
+         sNatCtrl = new NatController(sSecondaryTableCtrl);
+     if (!sPppCtrl)
+         sPppCtrl = new PppController();
+-    if (!sPanCtrl)
+-        sPanCtrl = new PanController();
+     if (!sSoftapCtrl)
+         sSoftapCtrl = new SoftapController();
+     if (!sBandwidthCtrl)
+@@ -84,16 +153,36 @@ CommandListener::CommandListener() :
+         sIdletimerCtrl = new IdletimerController();
+     if (!sResolverCtrl)
+         sResolverCtrl = new ResolverController();
++    if (!sFirewallCtrl)
++        sFirewallCtrl = new FirewallController();
++    if (!sInterfaceCtrl)
++        sInterfaceCtrl = new InterfaceController();
+ 
+     /*
+-     * This is the only time controllers are allowed to touch
+-     * top-level chains in iptables.
+-     * Each controller should setup custom chains and hook them into
+-     * the top-level ones.
+-     * THE ORDER IS IMPORTANT. TRIPPLE CHECK EACH setup function.
++     * This is the only time we touch top-level chains in iptables; controllers
++     * should only mutate rules inside of their children chains, as created by
++     * the constants above.
++     *
++     * Modules should never ACCEPT packets (except in well-justified cases);
++     * they should instead defer to any remaining modules using RETURN, or
++     * otherwise DROP/REJECT.
+      */
+-    /* Does DROP in nat: PREROUTING, FORWARD, OUTPUT */
++
++    // Create chains for children modules
++    createChildChains(V4V6, "filter", "INPUT", FILTER_INPUT);
++    createChildChains(V4V6, "filter", "FORWARD", FILTER_FORWARD);
++    createChildChains(V4V6, "filter", "OUTPUT", FILTER_OUTPUT);
++    createChildChains(V4V6, "raw", "PREROUTING", RAW_PREROUTING);
++    createChildChains(V4V6, "mangle", "POSTROUTING", MANGLE_POSTROUTING);
++    createChildChains(V4, "nat", "PREROUTING", NAT_PREROUTING);
++    createChildChains(V4, "nat", "POSTROUTING", NAT_POSTROUTING);
++
++    // Let each module setup their child chains
+     setupOemIptablesHook();
++
++    /* When enabled, DROPs all packets except those matching rules. */
++    sFirewallCtrl->setupIptablesHooks();
++
+     /* Does DROPs in FORWARD by default */
+     sNatCtrl->setupIptablesHooks();
+     /*
+@@ -227,6 +316,22 @@ int CommandListener::InterfaceCmd::runCommand(SocketClient *cli,
+             cli->sendMsg(ResponseCode::CommandOkay, "Interface throttling set", false);
+         }
+         return 0;
++    } else if (!strcmp(argv[1], "driver")) {
++        int rc;
++        char *rbuf;
++
++        if (argc < 4) {
++            cli->sendMsg(ResponseCode::CommandSyntaxError,
++                    "Usage: interface driver <interface> <cmd> <args>", false);
++            return 0;
++        }
++        rc = sInterfaceCtrl->interfaceCommand(argc, argv, &rbuf);
++        if (rc) {
++            cli->sendMsg(ResponseCode::OperationFailed, "Failed to execute command", true);
++        } else {
++            cli->sendMsg(ResponseCode::CommandOkay, rbuf, false);
++        }
++        return 0;
+     } else {
+         /*
+          * These commands take a minimum of 3 arguments
+@@ -335,8 +440,8 @@ int CommandListener::InterfaceCmd::runCommand(SocketClient *cli,
+             ifc_close();
+             return 0;
+         } else if (!strcmp(argv[1], "setcfg")) {
+-            // arglist: iface addr prefixLength flags
+-            if (argc < 5) {
++            // arglist: iface [addr prefixLength] flags
++            if (argc < 4) {
+                 cli->sendMsg(ResponseCode::CommandSyntaxError, "Missing argument", false);
+                 return 0;
+             }
+@@ -344,28 +449,30 @@ int CommandListener::InterfaceCmd::runCommand(SocketClient *cli,
+ 
+             struct in_addr addr;
+             unsigned flags = 0;
+-
+-            if (!inet_aton(argv[3], &addr)) {
+-                cli->sendMsg(ResponseCode::CommandParameterError, "Invalid address", false);
+-                return 0;
+-            }
++            int index = 5;
+ 
+             ifc_init();
+-            if (ifc_set_addr(argv[2], addr.s_addr)) {
+-                cli->sendMsg(ResponseCode::OperationFailed, "Failed to set address", true);
+-                ifc_close();
+-                return 0;
+-            }
+ 
+-            //Set prefix length on a non zero address
+-            if (addr.s_addr != 0 && ifc_set_prefixLength(argv[2], atoi(argv[4]))) {
+-                cli->sendMsg(ResponseCode::OperationFailed, "Failed to set prefixLength", true);
+-                ifc_close();
+-                return 0;
++            if (!inet_aton(argv[3], &addr)) {
++                // Handle flags only case
++                index = 3;
++            } else {
++                if (ifc_set_addr(argv[2], addr.s_addr)) {
++                    cli->sendMsg(ResponseCode::OperationFailed, "Failed to set address", true);
++                    ifc_close();
++                    return 0;
++                }
++
++                // Set prefix length on a non zero address
++                if (addr.s_addr != 0 && ifc_set_prefixLength(argv[2], atoi(argv[4]))) {
++                   cli->sendMsg(ResponseCode::OperationFailed, "Failed to set prefixLength", true);
++                   ifc_close();
++                   return 0;
++               }
+             }
+ 
+             /* Process flags */
+-            for (int i = 5; i < argc; i++) {
++            for (int i = index; i < argc; i++) {
+                 char *flag = argv[i];
+                 if (!strcmp(flag, "up")) {
+                     ALOGD("Trying to bring up %s", argv[2]);
+@@ -532,6 +639,12 @@ int CommandListener::TetherCmd::runCommand(SocketClient *cli,
+ 
+     if (!strcmp(argv[1], "stop")) {
+         rc = sTetherCtrl->stopTethering();
++    } else if(!strcmp(argv[1], "start-reverse")) {
++        ALOGD("CommandListener::TetherCmd::run, call startReverseTethering, iface:%s", argv[2]);
++        sTetherCtrl->startReverseTethering(argv[2]);
++    } else if (!strcmp(argv[1], "stop-reverse")) {
++        ALOGD("CommandListener::TetherCmd::run, call stopReverseTethering");
++        rc = sTetherCtrl->stopReverseTethering();
+     } else if (!strcmp(argv[1], "status")) {
+         char *tmp = NULL;
+ 
+@@ -712,45 +825,6 @@ int CommandListener::PppdCmd::runCommand(SocketClient *cli,
+     return 0;
+ }
+ 
+-CommandListener::PanCmd::PanCmd() :
+-                 NetdCommand("pan") {
+-}
+-
+-int CommandListener::PanCmd::runCommand(SocketClient *cli,
+-                                        int argc, char **argv) {
+-    int rc = 0;
+-
+-    if (argc < 2) {
+-        cli->sendMsg(ResponseCode::CommandSyntaxError, "Missing argument", false);
+-        return 0;
+-    }
+-
+-    if (!strcmp(argv[1], "start")) {
+-        rc = sPanCtrl->startPan();
+-    } else if (!strcmp(argv[1], "stop")) {
+-        rc = sPanCtrl->stopPan();
+-    } else if (!strcmp(argv[1], "status")) {
+-        char *tmp = NULL;
+-
+-        asprintf(&tmp, "Pan services %s",
+-                 (sPanCtrl->isPanStarted() ? "started" : "stopped"));
+-        cli->sendMsg(ResponseCode::PanStatusResult, tmp, false);
+-        free(tmp);
+-        return 0;
+-    } else {
+-        cli->sendMsg(ResponseCode::CommandSyntaxError, "Unknown pan cmd", false);
+-        return 0;
+-    }
+-
+-    if (!rc) {
+-        cli->sendMsg(ResponseCode::CommandOkay, "Pan operation succeeded", false);
+-    } else {
+-        cli->sendMsg(ResponseCode::OperationFailed, "Pan operation failed", true);
+-    }
+-
+-    return 0;
+-}
+-
+ CommandListener::SoftapCmd::SoftapCmd() :
+                  NetdCommand("softap") {
+ }
+@@ -1240,11 +1314,12 @@ int CommandListener::IdletimerControlCmd::runCommand(SocketClient *cli, int argc
+       return 0;
+     }
+     if (!strcmp(argv[1], "add")) {
+-        if (argc != 4) {
++        if (argc != 5) {
+             cli->sendMsg(ResponseCode::CommandSyntaxError, "Missing argument", false);
+             return 0;
+         }
+-        if(0 != sIdletimerCtrl->addInterfaceIdletimer(argv[2], atoi(argv[3]))) {
++        if(0 != sIdletimerCtrl->addInterfaceIdletimer(
++                                        argv[2], atoi(argv[3]), argv[4])) {
+           cli->sendMsg(ResponseCode::OperationFailed, "Failed to add interface", false);
+         } else {
+           cli->sendMsg(ResponseCode::CommandOkay,  "Add success", false);
+@@ -1252,12 +1327,13 @@ int CommandListener::IdletimerControlCmd::runCommand(SocketClient *cli, int argc
+         return 0;
+     }
+     if (!strcmp(argv[1], "remove")) {
+-        if (argc != 4) {
++        if (argc != 5) {
+             cli->sendMsg(ResponseCode::CommandSyntaxError, "Missing argument", false);
+             return 0;
+         }
+         // ashish: fixme timeout
+-        if (0 != sIdletimerCtrl->removeInterfaceIdletimer(argv[2], atoi(argv[3]))) {
++        if (0 != sIdletimerCtrl->removeInterfaceIdletimer(
++                                        argv[2], atoi(argv[3]), argv[4])) {
+           cli->sendMsg(ResponseCode::OperationFailed, "Failed to remove interface", false);
+         } else {
+           cli->sendMsg(ResponseCode::CommandOkay, "Remove success", false);
+@@ -1268,3 +1344,110 @@ int CommandListener::IdletimerControlCmd::runCommand(SocketClient *cli, int argc
+     cli->sendMsg(ResponseCode::CommandSyntaxError, "Unknown idletimer cmd", false);
+     return 0;
+ }
++
++CommandListener::FirewallCmd::FirewallCmd() :
++    NetdCommand("firewall") {
++}
++
++int CommandListener::FirewallCmd::sendGenericOkFail(SocketClient *cli, int cond) {
++    if (!cond) {
++        cli->sendMsg(ResponseCode::CommandOkay, "Firewall command succeeded", false);
++    } else {
++        cli->sendMsg(ResponseCode::OperationFailed, "Firewall command failed", false);
++    }
++    return 0;
++}
++
++FirewallRule CommandListener::FirewallCmd::parseRule(const char* arg) {
++    if (!strcmp(arg, "allow")) {
++        return ALLOW;
++    } else {
++        return DENY;
++    }
++}
++
++int CommandListener::FirewallCmd::runCommand(SocketClient *cli, int argc,
++        char **argv) {
++    if (argc < 2) {
++        cli->sendMsg(ResponseCode::CommandSyntaxError, "Missing command", false);
++        return 0;
++    }
++
++    if (!strcmp(argv[1], "enable")) {
++        int res = sFirewallCtrl->enableFirewall();
++        return sendGenericOkFail(cli, res);
++    }
++    if (!strcmp(argv[1], "disable")) {
++        int res = sFirewallCtrl->disableFirewall();
++        return sendGenericOkFail(cli, res);
++    }
++    if (!strcmp(argv[1], "is_enabled")) {
++        int res = sFirewallCtrl->isFirewallEnabled();
++        return sendGenericOkFail(cli, res);
++    }
++
++    if (!strcmp(argv[1], "set_interface_rule")) {
++        if (argc != 4) {
++            cli->sendMsg(ResponseCode::CommandSyntaxError,
++                         "Usage: firewall set_interface_rule <rmnet0> <allow|deny>", false);
++            return 0;
++        }
++
++        const char* iface = argv[2];
++        FirewallRule rule = parseRule(argv[3]);
++
++        int res = sFirewallCtrl->setInterfaceRule(iface, rule);
++        return sendGenericOkFail(cli, res);
++    }
++
++    if (!strcmp(argv[1], "set_egress_source_rule")) {
++        if (argc != 4) {
++            cli->sendMsg(ResponseCode::CommandSyntaxError,
++                         "Usage: firewall set_egress_source_rule <192.168.0.1> <allow|deny>",
++                         false);
++            return 0;
++        }
++
++        const char* addr = argv[2];
++        FirewallRule rule = parseRule(argv[3]);
++
++        int res = sFirewallCtrl->setEgressSourceRule(addr, rule);
++        return sendGenericOkFail(cli, res);
++    }
++
++    if (!strcmp(argv[1], "set_egress_dest_rule")) {
++        if (argc != 5) {
++            cli->sendMsg(ResponseCode::CommandSyntaxError,
++                         "Usage: firewall set_egress_dest_rule <192.168.0.1> <80> <allow|deny>",
++                         false);
++            return 0;
++        }
++
++        const char* addr = argv[2];
++        int port = atoi(argv[3]);
++        FirewallRule rule = parseRule(argv[4]);
++
++        int res = 0;
++        res |= sFirewallCtrl->setEgressDestRule(addr, PROTOCOL_TCP, port, rule);
++        res |= sFirewallCtrl->setEgressDestRule(addr, PROTOCOL_UDP, port, rule);
++        return sendGenericOkFail(cli, res);
++    }
++
++    if (!strcmp(argv[1], "set_uid_rule")) {
++        if (argc != 4) {
++            cli->sendMsg(ResponseCode::CommandSyntaxError,
++                         "Usage: firewall set_uid_rule <1000> <allow|deny>",
++                         false);
++            return 0;
++        }
++
++        int uid = atoi(argv[2]);
++        FirewallRule rule = parseRule(argv[3]);
++
++        int res = sFirewallCtrl->setUidRule(uid, rule);
++        return sendGenericOkFail(cli, res);
++    }
++
++    cli->sendMsg(ResponseCode::CommandSyntaxError, "Unknown command", false);
++    return 0;
++}
+diff --git a/CommandListener.h b/CommandListener.h
+index a9da6d7..6cae13e 100644
+--- a/CommandListener.h
++++ b/CommandListener.h
+@@ -23,23 +23,25 @@
+ #include "TetherController.h"
+ #include "NatController.h"
+ #include "PppController.h"
+-#include "PanController.h"
+ #include "SoftapController.h"
+ #include "BandwidthController.h"
+ #include "IdletimerController.h"
++#include "InterfaceController.h"
+ #include "ResolverController.h"
+ #include "SecondaryTableController.h"
++#include "FirewallController.h"
+ 
+ class CommandListener : public FrameworkListener {
+     static TetherController *sTetherCtrl;
+     static NatController *sNatCtrl;
+     static PppController *sPppCtrl;
+-    static PanController *sPanCtrl;
+     static SoftapController *sSoftapCtrl;
+     static BandwidthController *sBandwidthCtrl;
+     static IdletimerController *sIdletimerCtrl;
++    static InterfaceController *sInterfaceCtrl;
+     static ResolverController *sResolverCtrl;
+     static SecondaryTableController *sSecondaryTableCtrl;
++    static FirewallController *sFirewallCtrl;
+ 
+ public:
+     CommandListener();
+@@ -100,13 +102,6 @@ private:
+         int runCommand(SocketClient *c, int argc, char ** argv);
+     };
+ 
+-    class PanCmd : public NetdCommand {
+-    public:
+-        PanCmd();
+-        virtual ~PanCmd() {}
+-        int runCommand(SocketClient *c, int argc, char ** argv);
+-    };
+-
+     class BandwidthControlCmd : public NetdCommand {
+     public:
+         BandwidthControlCmd();
+@@ -131,6 +126,16 @@ private:
+         virtual ~ResolverCmd() {}
+         int runCommand(SocketClient *c, int argc, char ** argv);
+     };
++
++    class FirewallCmd: public NetdCommand {
++    public:
++        FirewallCmd();
++        virtual ~FirewallCmd() {}
++        int runCommand(SocketClient *c, int argc, char ** argv);
++    protected:
++        int sendGenericOkFail(SocketClient *cli, int cond);
++        static FirewallRule parseRule(const char* arg);
++    };
+ };
+ 
+ #endif
+diff --git a/DnsProxyListener.cpp b/DnsProxyListener.cpp
+index 6c09e69..7da6b43 100644
+--- a/DnsProxyListener.cpp
++++ b/DnsProxyListener.cpp
+@@ -24,6 +24,7 @@
+ #include <sys/socket.h>
+ #include <sys/types.h>
+ #include <string.h>
++#include <pthread.h>
+ 
+ #define LOG_TAG "DnsProxyListener"
+ #define DBG 0
+@@ -47,7 +48,8 @@ DnsProxyListener::GetAddrInfoHandler::~GetAddrInfoHandler() {
+ }
+ 
+ void DnsProxyListener::GetAddrInfoHandler::start() {
+-    pthread_create(&mThread, NULL,
++    pthread_t thread;
++    pthread_create(&thread, NULL,
+                    DnsProxyListener::GetAddrInfoHandler::threadStart, this);
+ }
+ 
+@@ -215,7 +217,8 @@ DnsProxyListener::GetHostByAddrHandler::~GetHostByAddrHandler() {
+ }
+ 
+ void DnsProxyListener::GetHostByAddrHandler::start() {
+-    pthread_create(&mThread, NULL,
++    pthread_t thread;
++    pthread_create(&thread, NULL,
+                    DnsProxyListener::GetHostByAddrHandler::threadStart, this);
+ }
+ 
+diff --git a/DnsProxyListener.h b/DnsProxyListener.h
+index 1e24ebd..24c3b6a 100644
+--- a/DnsProxyListener.h
++++ b/DnsProxyListener.h
+@@ -17,7 +17,6 @@
+ #ifndef _DNSPROXYLISTENER_H__
+ #define _DNSPROXYLISTENER_H__
+ 
+-#include <pthread.h>
+ #include <sysutils/FrameworkListener.h>
+ 
+ #include "NetdCommand.h"
+@@ -53,7 +52,6 @@ private:
+ 
+     private:
+         void run();
+-        pthread_t mThread;
+         SocketClient* mClient;  // ref counted
+         char* mHost;    // owned
+         char* mService; // owned
+@@ -85,7 +83,6 @@ private:
+ 
+     private:
+         void run();
+-        pthread_t mThread;
+         SocketClient* mClient;  // ref counted
+         void* mAddress;    // address to lookup; owned
+         int   mAddressLen; // length of address to look up
+diff --git a/FirewallController.cpp b/FirewallController.cpp
+new file mode 100644
+index 0000000..0746316
+--- /dev/null
++++ b/FirewallController.cpp
+@@ -0,0 +1,149 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <errno.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#define LOG_TAG "FirewallController"
++#define LOG_NDEBUG 0
++
++#include <cutils/log.h>
++
++#include "NetdConstants.h"
++#include "FirewallController.h"
++
++const char* FirewallController::LOCAL_INPUT = "fw_INPUT";
++const char* FirewallController::LOCAL_OUTPUT = "fw_OUTPUT";
++const char* FirewallController::LOCAL_FORWARD = "fw_FORWARD";
++
++FirewallController::FirewallController(void) {
++}
++
++int FirewallController::setupIptablesHooks(void) {
++    return 0;
++}
++
++int FirewallController::enableFirewall(void) {
++    int res = 0;
++
++    // flush any existing rules
++    disableFirewall();
++
++    // create default rule to drop all traffic
++    res |= execIptables(V4V6, "-A", LOCAL_INPUT, "-j", "DROP", NULL);
++    res |= execIptables(V4V6, "-A", LOCAL_OUTPUT, "-j", "REJECT", NULL);
++    res |= execIptables(V4V6, "-A", LOCAL_FORWARD, "-j", "REJECT", NULL);
++
++    return res;
++}
++
++int FirewallController::disableFirewall(void) {
++    int res = 0;
++
++    // flush any existing rules
++    res |= execIptables(V4V6, "-F", LOCAL_INPUT, NULL);
++    res |= execIptables(V4V6, "-F", LOCAL_OUTPUT, NULL);
++    res |= execIptables(V4V6, "-F", LOCAL_FORWARD, NULL);
++
++    return res;
++}
++
++int FirewallController::isFirewallEnabled(void) {
++    // TODO: verify that rules are still in place near top
++    return -1;
++}
++
++int FirewallController::setInterfaceRule(const char* iface, FirewallRule rule) {
++    const char* op;
++    if (rule == ALLOW) {
++        op = "-I";
++    } else {
++        op = "-D";
++    }
++
++    int res = 0;
++    res |= execIptables(V4V6, op, LOCAL_INPUT, "-i", iface, "-j", "RETURN", NULL);
++    res |= execIptables(V4V6, op, LOCAL_OUTPUT, "-o", iface, "-j", "RETURN", NULL);
++    return res;
++}
++
++int FirewallController::setEgressSourceRule(const char* addr, FirewallRule rule) {
++    IptablesTarget target = V4;
++    if (strchr(addr, ':')) {
++        target = V6;
++    }
++
++    const char* op;
++    if (rule == ALLOW) {
++        op = "-I";
++    } else {
++        op = "-D";
++    }
++
++    int res = 0;
++    res |= execIptables(target, op, LOCAL_INPUT, "-d", addr, "-j", "RETURN", NULL);
++    res |= execIptables(target, op, LOCAL_OUTPUT, "-s", addr, "-j", "RETURN", NULL);
++    return res;
++}
++
++int FirewallController::setEgressDestRule(const char* addr, int protocol, int port,
++        FirewallRule rule) {
++    IptablesTarget target = V4;
++    if (strchr(addr, ':')) {
++        target = V6;
++    }
++
++    char protocolStr[16];
++    sprintf(protocolStr, "%d", protocol);
++
++    char portStr[16];
++    sprintf(portStr, "%d", port);
++
++    const char* op;
++    if (rule == ALLOW) {
++        op = "-I";
++    } else {
++        op = "-D";
++    }
++
++    int res = 0;
++    res |= execIptables(target, op, LOCAL_INPUT, "-s", addr, "-p", protocolStr,
++            "--sport", portStr, "-j", "RETURN", NULL);
++    res |= execIptables(target, op, LOCAL_OUTPUT, "-d", addr, "-p", protocolStr,
++            "--dport", portStr, "-j", "RETURN", NULL);
++    return res;
++}
++
++int FirewallController::setUidRule(int uid, FirewallRule rule) {
++    char uidStr[16];
++    sprintf(uidStr, "%d", uid);
++
++    const char* op;
++    if (rule == ALLOW) {
++        op = "-I";
++    } else {
++        op = "-D";
++    }
++
++    int res = 0;
++    res |= execIptables(V4V6, op, LOCAL_INPUT, "-m", "owner", "--uid-owner", uidStr,
++            "-j", "RETURN", NULL);
++    res |= execIptables(V4V6, op, LOCAL_OUTPUT, "-m", "owner", "--uid-owner", uidStr,
++            "-j", "RETURN", NULL);
++    return res;
++}
+diff --git a/FirewallController.h b/FirewallController.h
+new file mode 100644
+index 0000000..158e0fa
+--- /dev/null
++++ b/FirewallController.h
+@@ -0,0 +1,56 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _FIREWALL_CONTROLLER_H
++#define _FIREWALL_CONTROLLER_H
++
++#include <string>
++
++enum FirewallRule { ALLOW, DENY };
++
++#define PROTOCOL_TCP 6
++#define PROTOCOL_UDP 17
++
++/*
++ * Simple firewall that drops all packets except those matching explicitly
++ * defined ALLOW rules.
++ */
++class FirewallController {
++public:
++    FirewallController();
++
++    int setupIptablesHooks(void);
++
++    int enableFirewall(void);
++    int disableFirewall(void);
++    int isFirewallEnabled(void);
++
++    /* Match traffic going in/out over the given iface. */
++    int setInterfaceRule(const char*, FirewallRule);
++    /* Match traffic coming-in-to or going-out-from given address. */
++    int setEgressSourceRule(const char*, FirewallRule);
++    /* Match traffic coming-in-from or going-out-to given address, port, and protocol. */
++    int setEgressDestRule(const char*, int, int, FirewallRule);
++    /* Match traffic owned by given UID. */
++    int setUidRule(int, FirewallRule);
++
++    static const char* LOCAL_INPUT;
++    static const char* LOCAL_OUTPUT;
++    static const char* LOCAL_FORWARD;
++
++};
++
++#endif
+diff --git a/IdletimerController.cpp b/IdletimerController.cpp
+index efe4f09..7623f33 100644
+--- a/IdletimerController.cpp
++++ b/IdletimerController.cpp
+@@ -24,42 +24,65 @@
+  *
+  * iptables -F
+  *
+- * iptables -t nat -F idletimer_PREROUTING
+- * iptables -t nat -F idletimer_POSTROUTING
++ * iptables -t raw -F idletimer_PREROUTING
++ * iptables -t mangle -F idletimer_POSTROUTING
+  *
+  *
+- * iptables -t nat -N idletimer_PREROUTING
+- * iptables -t nat -N idletimer_POSTROUTING
++ * iptables -t raw -N idletimer_PREROUTING
++ * iptables -t mangle -N idletimer_POSTROUTING
+  *
+- * iptables -t nat -D PREROUTING -j idletimer_PREROUTING
+- * iptables -t nat -D POSTROUTING -j idletimer_POSTROUTING
++ * iptables -t raw -D PREROUTING -j idletimer_PREROUTING
++ * iptables -t mangle -D POSTROUTING -j idletimer_POSTROUTING
+  *
+  *
+- * iptables -t nat -I PREROUTING -j idletimer_PREROUTING
+- * iptables -t nat -I POSTROUTING -j idletimer_POSTROUTING
++ * iptables -t raw -I PREROUTING -j idletimer_PREROUTING
++ * iptables -t mangle -I POSTROUTING -j idletimer_POSTROUTING
+  *
+  * # For notifications to work the lable name must match the name of a valid interface.
+  * # If the label name does match an interface, the rules will be a no-op.
+  *
+- * iptables -t nat -A idletimer_PREROUTING -i rmnet0 -j IDLETIMER  --timeout 5 --label test-chain --send_nl_msg 1
+- * iptables -t nat -A idletimer_POSTROUTING -o rmnet0 -j IDLETIMER  --timeout 5 --label test-chain --send_nl_msg 1
++ * iptables -t raw -A idletimer_PREROUTING -i rmnet0 -j IDLETIMER  --timeout 5 --label test-chain --send_nl_msg 1
++ * iptables -t mangle -A idletimer_POSTROUTING -o rmnet0 -j IDLETIMER  --timeout 5 --label test-chain --send_nl_msg 1
+  *
+- * iptables -nxvL -t nat
++ * iptables -nxvL -t raw
++ * iptables -nxvL -t mangle
+  *
+  * =================
+  *
+  * ndc command sequence
+  * ------------------
+  * ndc idletimer enable
+- * ndc idletimer add <iface> <timeout>
+- * ndc idletimer remove <iface> <timeout>
++ * ndc idletimer add <iface> <timeout> <class label>
++ * ndc idletimer remove <iface> <timeout> <class label>
+  *
+  * Monitor effect on the iptables chains after each step using:
+- *     iptables -nxvL -t nat
++ *     iptables -nxvL -t raw
++ *     iptables -nxvL -t mangle
+  *
+  * Remember that the timeout value has to be same at the time of the
+  * removal.
+  *
++ * =================
++ *
++ * Verifying the iptables rule
++ * ---------------------------
++ * We want to make sure the iptable rules capture every packet. It can be
++ * verified with tcpdump. First take a note of the pkts count for the two rules:
++ *
++ * adb shell iptables -t mangle -L idletimer_mangle_POSTROUTING -v && adb shell iptables -t raw -L idletimer_raw_PREROUTING -v
++ *
++ * And then, before any network traffics happen on the device, run tcpdump:
++ *
++ * adb shell tcpdump | tee tcpdump.log
++ *
++ * After a while run iptables commands again, you could then count the number
++ * of incoming and outgoing packets captured by tcpdump, and compare that with
++ * the numbers reported by iptables command. There shouldn't be too much
++ * difference on these numbers, i.e., with 2000 packets captured it should
++ * differ by less than 5.
++ *
++ * =================
++ *
+  * Note that currently if the name of the iface is incorrect, iptables
+  * will setup rules without checking if it is the name of a valid
+  * interface (although no notifications will ever be received).  It is
+@@ -90,6 +113,9 @@
+ 
+ extern "C" int system_nosh(const char *command);
+ 
++const char* IdletimerController::LOCAL_RAW_PREROUTING = "idletimer_raw_PREROUTING";
++const char* IdletimerController::LOCAL_MANGLE_POSTROUTING = "idletimer_mangle_POSTROUTING";
++
+ IdletimerController::IdletimerController() {
+ }
+ 
+@@ -115,26 +141,23 @@ int IdletimerController::runIpxtablesCmd(const char *cmd) {
+ }
+ 
+ bool IdletimerController::setupIptablesHooks() {
+-    runIpxtablesCmd("-t nat -D PREROUTING -j idletimer_nat_PREROUTING");
+-    runIpxtablesCmd("-t nat -F idletimer_nat_PREROUTING");
+-    runIpxtablesCmd("-t nat -N idletimer_nat_PREROUTING");
+-
+-    runIpxtablesCmd("-t nat -D POSTROUTING -j idletimer_nat_POSTROUTING");
+-    runIpxtablesCmd("-t nat -F idletimer_nat_POSTROUTING");
+-    runIpxtablesCmd("-t nat -N idletimer_nat_POSTROUTING");
+-
+-    if (runIpxtablesCmd("-t nat -I PREROUTING -j idletimer_nat_PREROUTING")
+-        || runIpxtablesCmd("-t nat -I POSTROUTING -j idletimer_nat_POSTROUTING")) {
+-        return false;
+-    }
+     return true;
+ }
+ 
+ int IdletimerController::setDefaults() {
+-  if (runIpxtablesCmd("-t nat -F idletimer_nat_PREROUTING")
+-      || runIpxtablesCmd("-t nat -F idletimer_nat_POSTROUTING") )
+-      return -1;
+-  return 0;
++  int res;
++  char *buffer;
++  asprintf(&buffer, "-t raw -F %s", LOCAL_RAW_PREROUTING);
++  res = runIpxtablesCmd(buffer);
++  free(buffer);
++
++  if (res)
++    return res;
++
++  asprintf(&buffer, "-t mangle -F %s", LOCAL_MANGLE_POSTROUTING);
++  res = runIpxtablesCmd(buffer);
++  free(buffer);
++  return res;
+ }
+ 
+ int IdletimerController::enableIdletimerControl() {
+@@ -148,28 +171,36 @@ int IdletimerController::disableIdletimerControl() {
+ }
+ 
+ int IdletimerController::modifyInterfaceIdletimer(IptOp op, const char *iface,
+-                                                  uint32_t timeout) {
++                                                  uint32_t timeout,
++                                                  const char *classLabel) {
+   int res;
+   char *buffer;
+-  asprintf(&buffer, "-t nat -%c idletimer_nat_PREROUTING -i %s -j IDLETIMER"
++  asprintf(&buffer, "-t raw -%c %s -i %s -j IDLETIMER"
+            " --timeout %u --label %s --send_nl_msg 1",
+-           (op == IptOpAdd) ? 'A' : 'D', iface, timeout, iface);
++           (op == IptOpAdd) ? 'A' : 'D', LOCAL_RAW_PREROUTING, iface, timeout, classLabel);
+   res = runIpxtablesCmd(buffer);
+   free(buffer);
+ 
+-  asprintf(&buffer, "-t nat -%c idletimer_nat_POSTROUTING -o %s -j IDLETIMER"
++  if (res)
++    return res;
++
++  asprintf(&buffer, "-t mangle -%c %s -o %s -j IDLETIMER"
+            " --timeout %u --label %s --send_nl_msg 1",
+-           (op == IptOpAdd) ? 'A' : 'D', iface, timeout, iface);
+-  res |= runIpxtablesCmd(buffer);
++           (op == IptOpAdd) ? 'A' : 'D', LOCAL_MANGLE_POSTROUTING, iface, timeout, classLabel);
++  res = runIpxtablesCmd(buffer);
+   free(buffer);
+ 
+   return res;
+ }
+ 
+-int IdletimerController::addInterfaceIdletimer(const char *iface, uint32_t timeout) {
+-  return modifyInterfaceIdletimer(IptOpAdd, iface, timeout);
++int IdletimerController::addInterfaceIdletimer(const char *iface,
++                                               uint32_t timeout,
++                                               const char *classLabel) {
++  return modifyInterfaceIdletimer(IptOpAdd, iface, timeout, classLabel);
+ }
+ 
+-int IdletimerController::removeInterfaceIdletimer(const char *iface, uint32_t timeout) {
+-  return modifyInterfaceIdletimer(IptOpDelete, iface, timeout);
++int IdletimerController::removeInterfaceIdletimer(const char *iface,
++                                                  uint32_t timeout,
++                                                  const char *classLabel) {
++  return modifyInterfaceIdletimer(IptOpDelete, iface, timeout, classLabel);
+ }
+diff --git a/IdletimerController.h b/IdletimerController.h
+index a55f7af..eb2aa35 100644
+--- a/IdletimerController.h
++++ b/IdletimerController.h
+@@ -24,15 +24,21 @@ public:
+ 
+     int enableIdletimerControl();
+     int disableIdletimerControl();
+-    int addInterfaceIdletimer(const char *iface, uint32_t timeout);
+-    int removeInterfaceIdletimer(const char *iface, uint32_t timeout);
++    int addInterfaceIdletimer(const char *iface, uint32_t timeout,
++                              const char *classLabel);
++    int removeInterfaceIdletimer(const char *iface, uint32_t timeout,
++                                 const char *classLabel);
+     bool setupIptablesHooks();
+ 
++    static const char* LOCAL_RAW_PREROUTING;
++    static const char* LOCAL_MANGLE_POSTROUTING;
++
+  private:
+     enum IptOp { IptOpAdd, IptOpDelete };
+     int setDefaults();
+     int runIpxtablesCmd(const char *cmd);
+-    int modifyInterfaceIdletimer(IptOp op, const char *iface, uint32_t timeout);
++    int modifyInterfaceIdletimer(IptOp op, const char *iface, uint32_t timeout,
++                                 const char *classLabel);
+ };
+ 
+ #endif
+diff --git a/InterfaceController.cpp b/InterfaceController.cpp
+new file mode 100644
+index 0000000..e02b517
+--- /dev/null
++++ b/InterfaceController.cpp
+@@ -0,0 +1,101 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *	  http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <stdlib.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <string.h>
++
++#include <dlfcn.h>
++
++#include <sys/socket.h>
++#include <sys/stat.h>
++#include <sys/ioctl.h>
++#include <sys/types.h>
++
++#include <netinet/in.h>
++#include <arpa/inet.h>
++
++#define LOG_TAG "InterfaceController"
++#include <cutils/log.h>
++#include <netutils/ifc.h>
++#include <private/android_filesystem_config.h>
++
++#include "InterfaceController.h"
++
++char if_cmd_lib_file_name[] = "/system/lib/libnetcmdiface.so";
++char set_cmd_func_name[] = "net_iface_send_command";
++char set_cmd_init_func_name[] = "net_iface_send_command_init";
++char set_cmd_fini_func_name[] = "net_iface_send_command_fini";
++
++InterfaceController::InterfaceController()
++	: sendCommand_(NULL) {
++	libh_ = dlopen(if_cmd_lib_file_name, RTLD_NOW | RTLD_LOCAL);
++	if (libh_ == NULL) {
++		const char *err_str = dlerror();
++		ALOGW("Warning (%s) while opening the net interface command library", err_str ? err_str : "unknown");
++	} else {
++		sendCommandInit_ = (int (*)(void))dlsym(libh_, set_cmd_init_func_name);
++		if (sendCommandInit_ == NULL) {
++			const char *err_str = dlerror();
++			ALOGW("Error (%s) while searching for the interface command init function", err_str ? err_str : "unknown");
++		} else if (sendCommandInit_()) {
++			ALOGE("Can't init the interface command API");
++			return;
++		}
++		sendCommandFini_ = (int (*)(void))dlsym(libh_, set_cmd_fini_func_name);
++		if (sendCommandFini_ == NULL) {
++			const char *err_str = dlerror();
++			ALOGW("Error (%s) while searching for the interface command fini function", err_str ? err_str : "unknown");
++		}
++		sendCommand_ = (int (*)(int, char **, char **))dlsym(libh_, set_cmd_func_name);
++		if (sendCommand_ == NULL) {
++			const char *err_str = dlerror();
++			ALOGE("Error (%s) while searching for the interface command function", err_str ? err_str : "unknown");
++			return;
++		}
++	}
++}
++
++InterfaceController::~InterfaceController() {
++	if (sendCommandFini_) {
++		if (sendCommandFini_()) {
++			ALOGE("Can't shutdown the interface command API");
++		}
++	}
++	if (libh_) {
++		int err = dlclose(libh_);
++		if (err) {
++			const char *err_str = dlerror();
++			ALOGE("Error (%s) while closing the net interface command library", err_str ? err_str : "unknown");
++		}
++	}
++}
++
++/*
++ * Arguments:
++ *	  argv[2] - wlan interface
++ *	  argv[3] - command
++ *	  argv[4] - argument
++ *	  rbuf	- returned buffer
++ */
++int InterfaceController::interfaceCommand(int argc, char *argv[], char **rbuf) {
++	int ret = -ENOSYS;
++	if (sendCommand_)
++		ret = sendCommand_(argc, argv, rbuf);
++
++	return ret;
++}
+diff --git a/InterfaceController.h b/InterfaceController.h
+new file mode 100644
+index 0000000..e31cc11
+--- /dev/null
++++ b/InterfaceController.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *	  http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _INTERFACE_CONTROLLER_H
++#define _INTERFACE_CONTROLLER_H
++
++#include <linux/in.h>
++#include <net/if.h>
++
++typedef struct android_wifi_priv_cmd {
++	char *buf;
++	int used_len;
++	int total_len;
++} android_wifi_priv_cmd;
++
++#define INTERFACE_MAX_BUFFER_SIZE	256
++
++class InterfaceController {
++ public:
++	InterfaceController();
++	virtual ~InterfaceController();
++	int interfaceCommand(int argc, char *argv[], char **rbuf);
++
++ private:
++	void *libh_;
++	int (*sendCommand_)(int argc, char *argv[], char **rbuf);
++	int (*sendCommandInit_)(void);
++	int (*sendCommandFini_)(void);
++};
++
++#endif
+diff --git a/NatController.cpp b/NatController.cpp
+index 3ae4a97..ccb2e17 100644
+--- a/NatController.cpp
++++ b/NatController.cpp
+@@ -35,6 +35,9 @@
+ 
+ extern "C" int system_nosh(const char *command);
+ 
++const char* NatController::LOCAL_FORWARD = "natctrl_FORWARD";
++const char* NatController::LOCAL_NAT_POSTROUTING = "natctrl_nat_POSTROUTING";
++
+ NatController::NatController(SecondaryTableController *ctrl) {
+     secondaryTableCtrl = ctrl;
+ }
+@@ -61,30 +64,6 @@ int NatController::runCmd(const char *path, const char *cmd) {
+ }
+ 
+ int NatController::setupIptablesHooks() {
+-    if (runCmd(IPTABLES_PATH, "-P INPUT ACCEPT"))
+-        return -1;
+-    if (runCmd(IPTABLES_PATH, "-P OUTPUT ACCEPT"))
+-        return -1;
+-    if (runCmd(IPTABLES_PATH, "-P FORWARD ACCEPT"))
+-        return -1;
+-
+-    // Order is important!
+-    // -D to delete any pre-existing jump rule, to prevent dupes (no-op if doesn't exist)
+-    // -F to flush the chain (no-op if doesn't exist).
+-    // -N to create the chain (no-op if already exist).
+-
+-    runCmd(IPTABLES_PATH, "-D FORWARD -j natctrl_FORWARD");
+-    runCmd(IPTABLES_PATH, "-F natctrl_FORWARD");
+-    runCmd(IPTABLES_PATH, "-N natctrl_FORWARD");
+-    if (runCmd(IPTABLES_PATH, "-I FORWARD -j natctrl_FORWARD"))
+-        return -1;
+-
+-    runCmd(IPTABLES_PATH, "-t nat -D POSTROUTING -j natctrl_nat_POSTROUTING");
+-    runCmd(IPTABLES_PATH, "-t nat -F natctrl_nat_POSTROUTING");
+-    runCmd(IPTABLES_PATH, "-t nat -N natctrl_nat_POSTROUTING");
+-    if (runCmd(IPTABLES_PATH, "-t nat -A POSTROUTING -j natctrl_nat_POSTROUTING"))
+-        return -1;
+-
+     setDefaults();
+     return 0;
+ }
+diff --git a/NatController.h b/NatController.h
+index 1d328e5..c1979bb 100644
+--- a/NatController.h
++++ b/NatController.h
+@@ -31,6 +31,9 @@ public:
+     int disableNat(const int argc, char **argv);
+     int setupIptablesHooks();
+ 
++    static const char* LOCAL_FORWARD;
++    static const char* LOCAL_NAT_POSTROUTING;
++
+ private:
+     int natCount;
+     SecondaryTableController *secondaryTableCtrl;
+diff --git a/NetdConstants.cpp b/NetdConstants.cpp
+index e57b483..db1d4cd 100644
+--- a/NetdConstants.cpp
++++ b/NetdConstants.cpp
+@@ -14,6 +14,12 @@
+  * limitations under the License.
+  */
+ 
++#include <string.h>
++
++#define LOG_TAG "Netd"
++
++#include <cutils/log.h>
++
+ #include "NetdConstants.h"
+ 
+ const char * const OEM_SCRIPT_PATH = "/system/bin/oem-iptables-init.sh";
+@@ -23,3 +29,71 @@ const char * const TC_PATH = "/system/bin/tc";
+ const char * const IP_PATH = "/system/bin/ip";
+ const char * const ADD = "add";
+ const char * const DEL = "del";
++
++static void logExecError(const char* argv[], int res) {
++    const char** argp = argv;
++    std::string args = "";
++    while (*argp) {
++        args += *argp;
++        args += ' ';
++        argp++;
++    }
++    ALOGE("exec() res=%d for %s", res, args.c_str());
++}
++
++static int execIptables(IptablesTarget target, bool silent, va_list args) {
++    /* Read arguments from incoming va_list; we expect the list to be NULL terminated. */
++    std::list<const char*> argsList;
++    argsList.push_back(NULL);
++    const char* arg;
++    do {
++        arg = va_arg(args, const char *);
++        argsList.push_back(arg);
++    } while (arg);
++
++    int i = 0;
++    const char* argv[argsList.size()];
++    std::list<const char*>::iterator it;
++    for (it = argsList.begin(); it != argsList.end(); it++, i++) {
++        argv[i] = *it;
++    }
++
++    int res = 0;
++    if (target == V4 || target == V4V6) {
++        argv[0] = IPTABLES_PATH;
++        int localRes = fork_and_execve(argv[0], argv);
++        if (localRes) {
++            if (!silent) {
++                logExecError(argv, localRes);
++            }
++            res |= localRes;
++        }
++    }
++    if (target == V6 || target == V4V6) {
++        argv[0] = IP6TABLES_PATH;
++        int localRes = fork_and_execve(argv[0], argv);
++        if (localRes) {
++            if (!silent) {
++                logExecError(argv, localRes);
++            }
++            res |= localRes;
++        }
++    }
++    return res;
++}
++
++int execIptables(IptablesTarget target, ...) {
++    va_list args;
++    va_start(args, target);
++    int res = execIptables(target, false, args);
++    va_end(args);
++    return res;
++}
++
++int execIptablesSilently(IptablesTarget target, ...) {
++    va_list args;
++    va_start(args, target);
++    int res = execIptables(target, true, args);
++    va_end(args);
++    return res;
++}
+diff --git a/NetdConstants.h b/NetdConstants.h
+index 9943a05..8468f9b 100644
+--- a/NetdConstants.h
++++ b/NetdConstants.h
+@@ -17,6 +17,9 @@
+ #ifndef _NETD_CONSTANTS_H
+ #define _NETD_CONSTANTS_H
+ 
++#include <string>
++#include <list>
++#include <stdarg.h>
+ 
+ extern const char * const IPTABLES_PATH;
+ extern const char * const IP6TABLES_PATH;
+@@ -26,4 +29,11 @@ extern const char * const OEM_SCRIPT_PATH;
+ extern const char * const ADD;
+ extern const char * const DEL;
+ 
++extern "C" int fork_and_execve(const char*, const char*[]);
++
++enum IptablesTarget { V4, V6, V4V6 };
++
++int execIptables(IptablesTarget target, ...);
++int execIptablesSilently(IptablesTarget target, ...);
++
+ #endif
+diff --git a/NetlinkHandler.cpp b/NetlinkHandler.cpp
+index 94e9240..6621a9a 100644
+--- a/NetlinkHandler.cpp
++++ b/NetlinkHandler.cpp
+@@ -76,10 +76,14 @@ void NetlinkHandler::onEvent(NetlinkEvent *evt) {
+ 
+     } else if (!strcmp(subsys, "xt_idletimer")) {
+         int action = evt->getAction();
+-        const char *iface = evt->findParam("INTERFACE");
++        const char *label = evt->findParam("LABEL");
+         const char *state = evt->findParam("STATE");
++        // if no LABEL, use INTERFACE instead
++        if (label == NULL) {
++            label = evt->findParam("INTERFACE");
++        }
+         if (state)
+-            notifyInterfaceActivity(iface, !strcmp("active", state));
++            notifyInterfaceClassActivity(label, !strcmp("active", state));
+ 
+ #if !LOG_NDEBUG
+     } else if (strcmp(subsys, "platform") && strcmp(subsys, "backlight")) {
+@@ -131,12 +135,13 @@ void NetlinkHandler::notifyQuotaLimitReached(const char *name, const char *iface
+             msg, false);
+ }
+ 
+-void NetlinkHandler::notifyInterfaceActivity(const char *name, bool isActive) {
++void NetlinkHandler::notifyInterfaceClassActivity(const char *name,
++                                                  bool isActive) {
+     char msg[255];
+ 
+-    snprintf(msg, sizeof(msg), "Iface %s %s", name, isActive ? "active" : "idle");
++    snprintf(msg, sizeof(msg), "IfaceClass %s %s",
++             isActive ? "active" : "idle", name);
+     ALOGV("Broadcasting interface activity msg: %s", msg);
+-    mNm->getBroadcaster()->sendBroadcast(isActive ? ResponseCode::InterfaceActive
+-            : ResponseCode::InterfaceIdle,
+-            msg, false);
++    mNm->getBroadcaster()->sendBroadcast(
++        ResponseCode::InterfaceClassActivity, msg, false);
+ }
+diff --git a/NetlinkHandler.h b/NetlinkHandler.h
+index fe82934..50bface 100644
+--- a/NetlinkHandler.h
++++ b/NetlinkHandler.h
+@@ -38,6 +38,6 @@ protected:
+     void notifyInterfaceChanged(const char *name, bool isUp);
+     void notifyInterfaceLinkChanged(const char *name, bool isUp);
+     void notifyQuotaLimitReached(const char *name, const char *iface);
+-    void notifyInterfaceActivity(const char *name, bool isActive);
++    void notifyInterfaceClassActivity(const char *name, bool isActive);
+ };
+ #endif
+diff --git a/NetlinkManager.h b/NetlinkManager.h
+index 6515ea4..b7f011e 100644
+--- a/NetlinkManager.h
++++ b/NetlinkManager.h
+@@ -36,7 +36,6 @@ private:
+     int                  mUeventSock;
+     int                  mRouteSock;
+     int                  mQuotaSock;
+-    int                  mIfaceIdleTimerSock;
+ 
+ public:
+     virtual ~NetlinkManager();
+diff --git a/ResolverController.cpp b/ResolverController.cpp
+index 680be20..23554e8 100644
+--- a/ResolverController.cpp
++++ b/ResolverController.cpp
+@@ -19,7 +19,7 @@
+ 
+ #include <cutils/log.h>
+ 
+-#include <linux/if.h>
++#include <net/if.h>
+ 
+ // NOTE: <resolv_iface.h> is a private C library header that provides
+ //       declarations for _resolv_set_default_iface() and others.
+diff --git a/ResponseCode.h b/ResponseCode.h
+index 5bebb0f..c6f5c2d 100644
+--- a/ResponseCode.h
++++ b/ResponseCode.h
+@@ -34,7 +34,6 @@ public:
+     static const int CommandOkay               = 200;
+     static const int TetherStatusResult        = 210;
+     static const int IpFwdStatusResult         = 211;
+-    static const int PanStatusResult           = 212;
+     static const int InterfaceGetCfgResult     = 213;
+     static const int SoftapStatusResult        = 214;
+     static const int UsbRNDISStatusResult      = 215;
+@@ -72,7 +71,6 @@ public:
+     static const int ServiceSetHostnameSuccess      = 610;
+     static const int ServiceGetAddrInfoFailed       = 611;
+     static const int ServiceGetAddrInfoSuccess      = 612;
+-    static const int InterfaceActive                = 613;
+-    static const int InterfaceIdle                  = 614;
++    static const int InterfaceClassActivity         = 613;
+ };
+ #endif
+diff --git a/SecondaryTableController.h b/SecondaryTableController.h
+index 756ccd3..d2619cd 100644
+--- a/SecondaryTableController.h
++++ b/SecondaryTableController.h
+@@ -19,7 +19,7 @@
+ 
+ #include <sysutils/FrameworkListener.h>
+ 
+-#include <linux/if.h>
++#include <net/if.h>
+ 
+ #ifndef IFNAMSIZ
+ #define IFNAMSIZ 16
+diff --git a/SoftapController.cpp b/SoftapController.cpp
+index 9e50f6e..daee0b2 100644
+--- a/SoftapController.cpp
++++ b/SoftapController.cpp
+@@ -35,6 +35,7 @@
+ 
+ #define LOG_TAG "SoftapController"
+ #include <cutils/log.h>
++#include <cutils/properties.h>
+ #include <netutils/ifc.h>
+ #include <private/android_filesystem_config.h>
+ #include "wifi.h"
+@@ -45,6 +46,9 @@
+ #define HOSTAPD_DRIVER_NAME "nl80211"
+ #endif
+ 
++#define AP_DEFAULT_CHANNEL 5
++#define AP_SOCKET_PATH "/data/misc/wifi/hostapd"
++
+ static const char HOSTAPD_CONF_FILE[]    = "/data/misc/wifi/hostapd.conf";
+ 
+ SoftapController::SoftapController() {
+@@ -52,7 +56,6 @@ SoftapController::SoftapController() {
+     mSock = socket(AF_INET, SOCK_DGRAM, 0);
+     if (mSock < 0)
+         ALOGE("Failed to open socket");
+-    memset(mIface, 0, sizeof(mIface));
+ }
+ 
+ SoftapController::~SoftapController() {
+@@ -60,67 +63,12 @@ SoftapController::~SoftapController() {
+         close(mSock);
+ }
+ 
+-int SoftapController::setCommand(char *iface, const char *fname, unsigned buflen) {
+-#ifdef HAVE_HOSTAPD
+-    return 0;
+-#else
+-    char tBuf[SOFTAP_MAX_BUFFER_SIZE];
+-    struct iwreq wrq;
+-    struct iw_priv_args *priv_ptr;
+-    int i, j, ret;
+-    int cmd = 0, sub_cmd = 0;
+-
+-    strncpy(wrq.ifr_name, iface, sizeof(wrq.ifr_name));
+-    wrq.u.data.pointer = tBuf;
+-    wrq.u.data.length = sizeof(tBuf) / sizeof(struct iw_priv_args);
+-    wrq.u.data.flags = 0;
+-    if ((ret = ioctl(mSock, SIOCGIWPRIV, &wrq)) < 0) {
+-        ALOGE("SIOCGIPRIV failed: %d", ret);
+-        return ret;
+-    }
+-
+-    priv_ptr = (struct iw_priv_args *)wrq.u.data.pointer;
+-    for(i=0; i < wrq.u.data.length;i++) {
+-        if (strcmp(priv_ptr[i].name, fname) == 0) {
+-            cmd = priv_ptr[i].cmd;
+-            break;
+-        }
+-    }
+-
+-    if (i == wrq.u.data.length) {
+-        ALOGE("iface:%s, fname: %s - function not supported", iface, fname);
+-        return -1;
+-    }
+-
+-    if (cmd < SIOCDEVPRIVATE) {
+-        for(j=0; j < i; j++) {
+-            if ((priv_ptr[j].set_args == priv_ptr[i].set_args) &&
+-                (priv_ptr[j].get_args == priv_ptr[i].get_args) &&
+-                (priv_ptr[j].name[0] == '\0'))
+-                break;
+-        }
+-        if (j == i) {
+-            ALOGE("iface:%s, fname: %s - invalid private ioctl", iface, fname);
+-            return -1;
+-        }
+-        sub_cmd = cmd;
+-        cmd = priv_ptr[j].cmd;
+-    }
+-
+-    strncpy(wrq.ifr_name, iface, sizeof(wrq.ifr_name));
+-    if ((buflen == 0) && (*mBuf != 0))
+-        wrq.u.data.length = strlen(mBuf) + 1;
+-    else
+-        wrq.u.data.length = buflen;
+-    wrq.u.data.pointer = mBuf;
+-    wrq.u.data.flags = sub_cmd;
+-    ret = ioctl(mSock, cmd, &wrq);
+-    return ret;
+-#endif
+-}
+-
+ int SoftapController::startDriver(char *iface) {
+-    int ret;
++    int ret = 0;
++
++    ifc_init();
++    ret = ifc_up(iface);
++    ifc_close();
+ 
+     if (mSock < 0) {
+         ALOGE("Softap driver start - failed to open socket");
+@@ -132,27 +80,14 @@ int SoftapController::startDriver(char *iface) {
+     }
+ 
+     *mBuf = 0;
+-#ifdef LGE_SOFTAP
+-    ret = setCommand(iface, "START-SOFTAP");
+-#else
+-    ret = setCommand(iface, "START");
+-#endif
+-    if (ret < 0) {
+-        ALOGE("Softap driver start: %d", ret);
+-        return ret;
+-    }
+-#ifdef HAVE_HOSTAPD
+-    ifc_init();
+-    ret = ifc_up(iface);
+-    ifc_close();
+-#endif
++
+     usleep(AP_DRIVER_START_DELAY);
+-    ALOGD("Softap driver start: %d", ret);
++    ALOGD("Softap driver start");
+     return ret;
+ }
+ 
+ int SoftapController::stopDriver(char *iface) {
+-    int ret;
++    int ret = 0;
+ 
+     if (mSock < 0) {
+         ALOGE("Softap driver stop - failed to open socket");
+@@ -163,26 +98,17 @@ int SoftapController::stopDriver(char *iface) {
+         iface = mIface;
+     }
+     *mBuf = 0;
+-#ifdef HAVE_HOSTAPD
++
+     ifc_init();
+     ret = ifc_down(iface);
+     ifc_close();
+-    if (ret < 0) {
+-        ALOGE("Softap %s down: %d", iface, ret);
+-    }
+-#endif
+-#ifdef LGE_SOFTAP
+-    ret = setCommand(iface, "STOP-SOFTAP");
+-#else
+-    ret = setCommand(iface, "STOP");
+-#endif
+-    ALOGD("Softap driver stop: %d", ret);
++
++    ALOGD("Softap driver stop");
+     return ret;
+ }
+ 
+ int SoftapController::startSoftap() {
+     pid_t pid = 1;
+-    int ret = 0;
+ 
+     if (mPid) {
+         ALOGE("Softap already started");
+@@ -192,14 +118,13 @@ int SoftapController::startSoftap() {
+         ALOGE("Softap startap - failed to open socket");
+         return -1;
+     }
+-#ifdef HAVE_HOSTAPD
++
+     if ((pid = fork()) < 0) {
+         ALOGE("fork failed (%s)", strerror(errno));
+         return -1;
+     }
+-#endif
++
+     if (!pid) {
+-#ifdef HAVE_HOSTAPD
+ #ifndef HOSTAPD_NO_ENTROPY
+         ensure_entropy_file_exists();
+ #endif
+@@ -210,81 +135,54 @@ int SoftapController::startSoftap() {
+                   HOSTAPD_CONF_FILE, (char *) NULL)) {
+             ALOGE("execl failed (%s)", strerror(errno));
+         }
+-#endif
+         ALOGE("Should never get here!");
+         return -1;
+     } else {
+-        *mBuf = 0;
+-        ret = setCommand(mIface, "AP_BSS_START");
+-        if (ret) {
+-            ALOGE("Softap startap - failed: %d", ret);
+-        }
+-        else {
+-           mPid = pid;
+-           ALOGD("Softap startap - Ok");
+-           usleep(AP_BSS_START_DELAY);
+-        }
++        mPid = pid;
++        ALOGD("Softap startap - Ok");
++        usleep(AP_BSS_START_DELAY);
+     }
+-    return ret;
+-
++    return 0;
+ }
+ 
+ int SoftapController::stopSoftap() {
+-    int ret;
+-
+     if (mPid == 0) {
+         ALOGE("Softap already stopped");
+         return 0;
+     }
+ 
+-#ifdef HAVE_HOSTAPD
+     ALOGD("Stopping Softap service");
+     kill(mPid, SIGTERM);
+     waitpid(mPid, NULL, 0);
+-#endif
++
+     if (mSock < 0) {
+         ALOGE("Softap stopap - failed to open socket");
+         return -1;
+     }
+-    *mBuf = 0;
+-    ret = setCommand(mIface, "AP_BSS_STOP");
+     mPid = 0;
+-    ALOGD("Softap service stopped: %d", ret);
++    ALOGD("Softap service stopped");
+     usleep(AP_BSS_STOP_DELAY);
+-    return ret;
++    return 0;
+ }
+ 
+ bool SoftapController::isSoftapStarted() {
+     return (mPid != 0 ? true : false);
+ }
+ 
+-int SoftapController::addParam(int pos, const char *cmd, const char *arg)
+-{
+-    if (pos < 0)
+-        return pos;
+-    if ((unsigned)(pos + strlen(cmd) + strlen(arg) + 1) >= sizeof(mBuf)) {
+-        ALOGE("Command line is too big");
+-        return -1;
+-    }
+-    pos += sprintf(&mBuf[pos], "%s=%s,", cmd, arg);
+-    return pos;
+-}
+-
+ /*
+  * Arguments:
+  *      argv[2] - wlan interface
+- *      argv[3] - softap interface
+- *      argv[4] - SSID
+- *	argv[5] - Security
+- *	argv[6] - Key
+- *	argv[7] - Channel
+- *	argv[8] - Preamble
+- *	argv[9] - Max SCB
++ *      argv[3] - SSID
++ *	argv[4] - Security
++ *	argv[5] - Key
++ *	argv[6] - Channel
++ *	argv[7] - Preamble
++ *	argv[8] - Max SCB
+  */
+ int SoftapController::setSoftap(int argc, char *argv[]) {
+     char psk_str[2*SHA256_DIGEST_LENGTH+1];
+     int ret = 0, i = 0, fd;
+-    char *ssid, *iface;
++    char *ssid;
+ 
+     if (mSock < 0) {
+         ALOGE("Softap set - failed to open socket");
+@@ -295,33 +193,52 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
+         return -1;
+     }
+ 
+-    strncpy(mIface, argv[3], sizeof(mIface));
+-    iface = argv[2];
++    strncpy(mIface, argv[2], sizeof(mIface));
+ 
+-#ifdef HAVE_HOSTAPD
+     char *wbuf = NULL;
+     char *fbuf = NULL;
++    int channel = 0;
+ 
+-    if (argc > 4) {
+-        ssid = argv[4];
++    if (argc > 3) {
++        ssid = argv[3];
+     } else {
+         ssid = (char *)"AndroidAP";
+     }
+ 
+-    asprintf(&wbuf, "interface=%s\ndriver=" HOSTAPD_DRIVER_NAME "\nctrl_interface="
+-            "/data/misc/wifi/hostapd\nssid=%s\nchannel=6\nieee80211n=1\n",
+-            iface, ssid);
++    if (argc > 6) {
++        channel = atoi(argv[6]);
++    } else {
++        char value[PROPERTY_VALUE_MAX];
++        property_get("wifi.ap.channel", value, "0");
++        channel = atoi(value);
++    }
++    if (channel == 0) {
++        channel = AP_DEFAULT_CHANNEL;
++        ALOGV("No valid wifi channel specified, using default");
++    }
+ 
+-    if (argc > 5) {
+-        if (!strcmp(argv[5], "wpa-psk")) {
+-            generatePsk(ssid, argv[6], psk_str);
++#ifdef HAVE_LEGACY_HOSTAPD
++    asprintf(&wbuf, "interface=%s\nctrl_interface=" AP_SOCKET_PATH "\n"
++#else
++    asprintf(&wbuf, "interface=%s\ndriver=" HOSTAPD_DRIVER_NAME "\n"
++                    "ctrl_interface=" AP_SOCKET_PATH "\n"
++#endif
++                    "ssid=%s\nchannel=%d\n", mIface, ssid, channel);
++
++    ALOGV("%s", wbuf);
++
++    if (argc > 4) {
++        if (!strcmp(argv[4], "wpa-psk")) {
++            generatePsk(ssid, argv[5], psk_str);
+             asprintf(&fbuf, "%swpa=1\nwpa_pairwise=TKIP CCMP\nwpa_psk=%s\n", wbuf, psk_str);
+-        } else if (!strcmp(argv[5], "wpa2-psk")) {
+-            generatePsk(ssid, argv[6], psk_str);
+-            asprintf(&fbuf, "%swpa=2\nrsn_pairwise=CCMP\nwpa_psk=%s\n", wbuf, psk_str);
+-        } else if (!strcmp(argv[5], "open")) {
++        } else if (!strcmp(argv[4], "wpa2-psk")) {
++            generatePsk(ssid, argv[5], psk_str);
++            asprintf(&fbuf, "%swpa=2\nwpa_pairwise=CCMP\nwpa_psk=%s\n", wbuf, psk_str);
++        } else if (!strcmp(argv[4], "open")) {
+             asprintf(&fbuf, "%s", wbuf);
+-        }
++        } else {
++            ALOGE("Invalid softap security type '%s'!\n", argv[4]);
++	}
+     } else {
+         asprintf(&fbuf, "%s", wbuf);
+     }
+@@ -355,58 +272,6 @@ int SoftapController::setSoftap(int argc, char *argv[]) {
+         unlink(HOSTAPD_CONF_FILE);
+         return -1;
+     }
+-
+-#else
+-    /* Create command line */
+-    i = addParam(i, "ASCII_CMD", "AP_CFG");
+-    if (argc > 4) {
+-        ssid = argv[4];
+-    } else {
+-        ssid = (char *)"AndroidAP";
+-    }
+-    i = addParam(i, "SSID", ssid);
+-    if (argc > 5) {
+-        i = addParam(i, "SEC", argv[5]);
+-    } else {
+-        i = addParam(i, "SEC", "open");
+-    }
+-    if (argc > 6) {
+-        generatePsk(ssid, argv[6], psk_str);
+-        i = addParam(i, "KEY", psk_str);
+-    } else {
+-        i = addParam(i, "KEY", "12345678");
+-    }
+-    if (argc > 7) {
+-        i = addParam(i, "CHANNEL", argv[7]);
+-    } else {
+-        i = addParam(i, "CHANNEL", "6");
+-    }
+-    if (argc > 8) {
+-        i = addParam(i, "PREAMBLE", argv[8]);
+-    } else {
+-        i = addParam(i, "PREAMBLE", "0");
+-    }
+-    if (argc > 9) {
+-        i = addParam(i, "MAX_SCB", argv[9]);
+-    } else {
+-        i = addParam(i, "MAX_SCB", "8");
+-    }
+-    if ((i < 0) || ((unsigned)(i + 4) >= sizeof(mBuf))) {
+-        ALOGE("Softap set - command is too big");
+-        return i;
+-    }
+-    sprintf(&mBuf[i], "END");
+-
+-    /* system("iwpriv eth0 WL_AP_CFG ASCII_CMD=AP_CFG,SSID=\"AndroidAP\",SEC=\"open\",KEY=12345,CHANNEL=1,PREAMBLE=0,MAX_SCB=8,END"); */
+-    ret = setCommand(iface, "AP_SET_CFG");
+-    if (ret) {
+-        ALOGE("Softap set - failed: %d", ret);
+-    }
+-    else {
+-        ALOGD("Softap set - Ok");
+-        usleep(AP_SET_CFG_DELAY);
+-    }
+-#endif
+     return ret;
+ }
+ 
+@@ -431,6 +296,9 @@ void SoftapController::generatePsk(char *ssid, char *passphrase, char *psk_str)
+  */
+ int SoftapController::fwReloadSoftap(int argc, char *argv[])
+ {
++#ifdef WLAN_NO_FWRELOAD
++    return 0;
++#endif
+     int ret, i = 0;
+     char *iface;
+     char *fwpath;
+@@ -445,7 +313,6 @@ int SoftapController::fwReloadSoftap(int argc, char *argv[])
+     }
+ 
+     iface = argv[2];
+-
+     if (strcmp(argv[3], "AP") == 0) {
+         fwpath = (char *)wifi_get_fw_path(WIFI_GET_FW_PATH_AP);
+     } else if (strcmp(argv[3], "P2P") == 0) {
+@@ -453,18 +320,15 @@ int SoftapController::fwReloadSoftap(int argc, char *argv[])
+     } else {
+         fwpath = (char *)wifi_get_fw_path(WIFI_GET_FW_PATH_STA);
+     }
+-    if (!fwpath)
+-        return -1;
+-#ifdef HAVE_HOSTAPD
++
++    if (!fwpath) {
++        ALOGD("Softap fwReload: no fwpath found");
++	return -1;
++    }
+     ret = wifi_change_fw_path((const char *)fwpath);
+-#else
+-    sprintf(mBuf, "FW_PATH=%s", fwpath);
+-    ret = setCommand(iface, "WL_FW_RELOAD");
+-#endif
+     if (ret) {
+         ALOGE("Softap fwReload - failed: %d", ret);
+-    }
+-    else {
++    } else {
+         ALOGD("Softap fwReload - Ok");
+     }
+     return ret;
+@@ -472,19 +336,5 @@ int SoftapController::fwReloadSoftap(int argc, char *argv[])
+ 
+ int SoftapController::clientsSoftap(char **retbuf)
+ {
+-    int ret;
+-
+-    if (mSock < 0) {
+-        ALOGE("Softap clients - failed to open socket");
+-        return -1;
+-    }
+-    *mBuf = 0;
+-    ret = setCommand(mIface, "AP_GET_STA_LIST", SOFTAP_MAX_BUFFER_SIZE);
+-    if (ret) {
+-        ALOGE("Softap clients - failed: %d", ret);
+-    } else {
+-        asprintf(retbuf, "Softap clients:%s", mBuf);
+-        ALOGD("Softap clients:%s", mBuf);
+-    }
+-    return ret;
++    return 0;
+ }
+diff --git a/SoftapController.h b/SoftapController.h
+index 0d275d2..4bcb071 100644
+--- a/SoftapController.h
++++ b/SoftapController.h
+@@ -32,8 +32,6 @@ class SoftapController {
+     pid_t mPid;
+     int mSock;
+ 
+-    int addParam(int pos, const char *cmd, const char *arg);
+-    int setCommand(char *iface, const char *fname, unsigned buflen=0);
+ public:
+     SoftapController();
+     virtual ~SoftapController();
+diff --git a/TetherController.cpp b/TetherController.cpp
+index a4f3fc6..240c483 100644
+--- a/TetherController.cpp
++++ b/TetherController.cpp
+@@ -38,6 +38,7 @@ TetherController::TetherController() {
+     mDnsForwarders = new NetAddressCollection();
+     mDaemonFd = -1;
+     mDaemonPid = 0;
++    mDhcpcdPid = 0;
+ }
+ 
+ TetherController::~TetherController() {
+@@ -139,17 +140,19 @@ int TetherController::startTethering(int num_addrs, struct in_addr* addrs, int l
+             close(pipefd[0]);
+         }
+ 
+-        int num_processed_args = 5 + (num_addrs/2) + 1; // 1 null for termination
++        int num_processed_args = 7 + (num_addrs/2) + 1; // 1 null for termination
+         char **args = (char **)malloc(sizeof(char *) * num_processed_args);
+         args[num_processed_args - 1] = NULL;
+         args[0] = (char *)"/system/bin/dnsmasq";
+-        args[1] = (char *)"--no-daemon";
++        args[1] = (char *)"--keep-in-foreground";
+         args[2] = (char *)"--no-resolv";
+         args[3] = (char *)"--no-poll";
+         // TODO: pipe through metered status from ConnService
+         args[4] = (char *)"--dhcp-option-force=43,ANDROID_METERED";
++        args[5] = (char *)"--pid-file";
++        args[6] = (char *)"";
+ 
+-        int nextArg = 5;
++        int nextArg = 7;
+         for (int addrIndex=0; addrIndex < num_addrs;) {
+             char *start = strdup(inet_ntoa(addrs[addrIndex++]));
+             char *end = strdup(inet_ntoa(addrs[addrIndex++]));
+@@ -190,6 +193,75 @@ int TetherController::stopTethering() {
+     return 0;
+ }
+ 
++// TODO(BT) remove
++int TetherController::startReverseTethering(const char* iface) {
++    if (mDhcpcdPid != 0) {
++        ALOGE("Reverse tethering already started");
++        errno = EBUSY;
++        return -1;
++    }
++
++    ALOGD("TetherController::startReverseTethering, Starting reverse tethering");
++
++    /*
++     * TODO: Create a monitoring thread to handle and restart
++     * the daemon if it exits prematurely
++     */
++    //cleanup the dhcp result
++    char dhcp_result_name[64];
++    snprintf(dhcp_result_name, sizeof(dhcp_result_name) - 1, "dhcp.%s.result", iface);
++    property_set(dhcp_result_name, "");
++
++    pid_t pid;
++    if ((pid = fork()) < 0) {
++        ALOGE("fork failed (%s)", strerror(errno));
++        return -1;
++    }
++
++    if (!pid) {
++
++        char *args[10];
++        int argc = 0;
++        args[argc++] = "/system/bin/dhcpcd";
++        char host_name[128];
++        if (property_get("net.hostname", host_name, NULL) && (host_name[0] != '\0'))
++        {
++            args[argc++] = "-h";
++            args[argc++] = host_name;
++        }
++        args[argc++] = (char*)iface;
++        args[argc] = NULL;
++        if (execv(args[0], args)) {
++            ALOGE("startReverseTethering, execv failed (%s)", strerror(errno));
++        }
++        ALOGE("startReverseTethering, Should never get here!");
++        // TODO(BT) inform parent of the failure.
++        //          Parent process need wait for child to report error status
++        //          before it set mDhcpcdPid and return 0.
++        exit(-1);
++    } else {
++        mDhcpcdPid = pid;
++        ALOGD("Reverse Tethering running, pid:%d", pid);
++    }
++    return 0;
++}
++
++// TODO(BT) remove
++int TetherController::stopReverseTethering() {
++
++    if (mDhcpcdPid == 0) {
++        ALOGE("Tethering already stopped");
++        return 0;
++    }
++
++    ALOGD("Stopping tethering services");
++
++    kill(mDhcpcdPid, SIGTERM);
++    waitpid(mDhcpcdPid, NULL, 0);
++    mDhcpcdPid = 0;
++    ALOGD("Tethering services stopped");
++    return 0;
++}
+ bool TetherController::isTetheringStarted() {
+     return (mDaemonPid == 0 ? false : true);
+ }
+@@ -215,8 +287,8 @@ int TetherController::setDnsForwarders(char **servers, int numServers) {
+             return -1;
+         }
+ 
+-        cmdLen += strlen(servers[i]);
+-        if (cmdLen + 2 >= MAX_CMD_SIZE) {
++        cmdLen += (strlen(servers[i]) + 1);
++        if (cmdLen + 1 >= MAX_CMD_SIZE) {
+             ALOGD("Too many DNS servers listed");
+             break;
+         }
+diff --git a/TetherController.h b/TetherController.h
+index faca66c..70ffa11 100644
+--- a/TetherController.h
++++ b/TetherController.h
+@@ -17,7 +17,7 @@
+ #ifndef _TETHER_CONTROLLER_H
+ #define _TETHER_CONTROLLER_H
+ 
+-#include <linux/in.h>
++#include <netinet/in.h>
+ 
+ #include "List.h"
+ 
+@@ -34,6 +34,7 @@ class TetherController {
+     InterfaceCollection  *mInterfaces;
+     NetAddressCollection *mDnsForwarders;
+     pid_t                 mDaemonPid;
++    pid_t                 mDhcpcdPid;
+     int                   mDaemonFd;
+ 
+ public:
+@@ -48,6 +49,9 @@ public:
+     int stopTethering();
+     bool isTetheringStarted();
+ 
++    int startReverseTethering(const char* iface);
++    int stopReverseTethering();
++
+     int setDnsForwarders(char **servers, int numServers);
+     NetAddressCollection *getDnsForwarders();
+ 
+diff --git a/logwrapper.c b/logwrapper.c
+index f5f4548..e84ae89 100644
+--- a/logwrapper.c
++++ b/logwrapper.c
+@@ -160,17 +160,14 @@ int logwrap(int argc, const char* argv[])
+     return 0;
+ }
+ 
++int fork_and_execve(const char*, char*[]);
++
+ /*
+  * The following is based off of bionic/libc/unistd/system.c with
+  *  modifications to avoid calling /system/bin/sh -c
+  */
+-extern char **environ;
+ int system_nosh(const char *command)
+ {
+-    pid_t pid;
+-    sig_t intsave, quitsave;
+-    sigset_t mask, omask;
+-    int pstat;
+     char buffer[255];
+     char *argp[32];
+     char *next = buffer;
+@@ -200,6 +197,15 @@ int system_nosh(const char *command)
+     }
+     argp[i] = NULL;
+ 
++    return fork_and_execve(argp[0], argp);
++}
++
++extern char **environ;
++int fork_and_execve(const char* filename, char* argv[]) {
++    pid_t pid;
++    sig_t intsave, quitsave;
++    sigset_t mask, omask;
++    int pstat;
+ 
+     sigemptyset(&mask);
+     sigaddset(&mask, SIGCHLD);
+@@ -210,7 +216,7 @@ int system_nosh(const char *command)
+         return(-1);
+     case 0:                                 /* child */
+         sigprocmask(SIG_SETMASK, &omask, NULL);
+-        execve(argp[0], argp, environ);
++        execve(filename, argv, environ);
+         _exit(127);
+     }
+ 
+diff --git a/ndc.c b/ndc.c
+index 17750bd..29a399a 100644
+--- a/ndc.c
++++ b/ndc.c
+@@ -65,25 +65,40 @@ int main(int argc, char **argv) {
+ }
+ 
+ static int do_cmd(int sock, int argc, char **argv) {
+-    char final_cmd[255] = { '0', ' ', '\0' };
++    char *final_cmd = strdup("0 ");
++    if (final_cmd == NULL) {
++        perror("strdup");
++        return errno;
++    }
++
+     int i;
+ 
+     for (i = 1; i < argc; i++) {
++        if (index(argv[i], '"')) {
++            perror("argument with embedded quotes not allowed");
++            free(final_cmd);
++            return 1;
++        }
++        bool needs_quoting = index(argv[i], ' ');
++        const char *format = needs_quoting ? "%s\"%s\"%s" : "%s%s%s";
+         char *cmp;
+ 
+-        if (!index(argv[i], ' '))
+-            asprintf(&cmp, "%s%s", argv[i], (i == (argc -1)) ? "" : " ");
+-        else
+-            asprintf(&cmp, "\"%s\"%s", argv[i], (i == (argc -1)) ? "" : " ");
+-
+-        strcat(final_cmd, cmp);
+-        free(cmp);
++        if (asprintf(&cmp, format, final_cmd, argv[i],
++                     (i == (argc -1)) ? "" : " ") < 0) {
++            perror("malloc");
++            free(final_cmd);
++            return errno;
++        }
++        free(final_cmd);
++        final_cmd = cmp;
+     }
+ 
+     if (write(sock, final_cmd, strlen(final_cmd) + 1) < 0) {
+         perror("write");
++        free(final_cmd);
+         return errno;
+     }
++    free(final_cmd);
+ 
+     return do_monitor(sock, 1);
+ }
+diff --git a/oem_iptables_hook.cpp b/oem_iptables_hook.cpp
+index d3026a9..fbf14f8 100644
+--- a/oem_iptables_hook.cpp
++++ b/oem_iptables_hook.cpp
+@@ -45,48 +45,10 @@ static int runIptablesCmd(const char *cmd) {
+     return res;
+ }
+ 
+-static bool oemSetupHooks() {
+-    // Order is important!
+-    // -N to create the chain (no-op if already exist).
+-    // -D to delete any pre-existing jump rule, to prevent dupes (no-op if doesn't exist)
+-    // -I to insert our jump rule into the default chain
+-
+-    runIptablesCmd("-N oem_out");
+-    runIptablesCmd("-D OUTPUT -j oem_out");
+-    if (runIptablesCmd("-I OUTPUT -j oem_out"))
+-        return false;
+-
+-    runIptablesCmd("-N oem_fwd");
+-    runIptablesCmd("-D FORWARD -j oem_fwd");
+-    if (runIptablesCmd("-I FORWARD -j oem_fwd"))
+-        return false;
+-
+-    runIptablesCmd("-t nat -N oem_nat_pre");
+-    runIptablesCmd("-t nat -D PREROUTING -j oem_nat_pre");
+-    if (runIptablesCmd("-t nat -I PREROUTING -j oem_nat_pre"))
+-        return false;
+-
+-    return true;
+-}
+-
+ static bool oemCleanupHooks() {
+-    // Order is important!
+-    // -D to remove ref to the chain
+-    // -F to empty the chain
+-    // -X to delete the chain
+-
+-    runIptablesCmd("-D OUTPUT -j oem_out");
+     runIptablesCmd("-F oem_out");
+-    runIptablesCmd("-X oem_out");
+-
+-    runIptablesCmd("-D FORWARD -j oem_fwd");
+     runIptablesCmd("-F oem_fwd");
+-    runIptablesCmd("-X oem_fwd");
+-
+-    runIptablesCmd("-t nat -D PREROUTING -j oem_nat_pre");
+     runIptablesCmd("-t nat -F oem_nat_pre");
+-    runIptablesCmd("-t nat -X oem_nat_pre");
+-
+     return true;
+ }
+ 
+@@ -106,7 +68,7 @@ void setupOemIptablesHook() {
+         // The call to oemCleanupHooks() is superfluous when done on bootup,
+         // but is needed for the case where netd has crashed/stopped and is
+         // restarted.
+-        if (oemCleanupHooks() && oemSetupHooks() && oemInitChains()) {
++        if (oemCleanupHooks() && oemInitChains()) {
+             ALOGI("OEM iptable hook installed.");
+         }
+     }
+diff --git a/oem_iptables_hook.h b/oem_iptables_hook.h
+index f5696ba..bc99638 100644
+--- a/oem_iptables_hook.h
++++ b/oem_iptables_hook.h
+@@ -17,6 +17,10 @@
+ #ifndef _OEM_IPTABLES_HOOK_H
+ #define _OEM_IPTABLES_HOOK_H
+ 
++#define OEM_IPTABLES_FILTER_OUTPUT "oem_out"
++#define OEM_IPTABLES_FILTER_FORWARD "oem_fwd"
++#define OEM_IPTABLES_NAT_PREROUTING "oem_nat_pre"
++
+ void setupOemIptablesHook();
+ 
+ #endif
+-- 
+2.1.0
+
