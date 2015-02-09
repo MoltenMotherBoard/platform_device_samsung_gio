@@ -1,4 +1,4 @@
-From 647719a31247d94afb9def3ca36d60b63c5bb235 Mon Sep 17 00:00:00 2001
+From fe75895a38a34e2cdc8cb739db84b6c33f74d65a Mon Sep 17 00:00:00 2001
 From: streambinder <davidepucci@hiddenhost.org>
 Date: Fri, 27 Jun 2014 00:03:48 +0200
 Subject: [PATCH] Backported Jellaxy&MMB CM Vendor patch
@@ -375,7 +375,7 @@ index 2a31cc3..407158a 100644
      group root
      oneshot
 diff --git a/tools/squisher b/tools/squisher
-index 552929f..c97ba9c 100755
+index 552929f..42cc5e1 100755
 --- a/tools/squisher
 +++ b/tools/squisher
 @@ -39,8 +39,15 @@ OPTICHARGER=$ANDROID_BUILD_TOP/vendor/cm/tools/opticharger
@@ -383,10 +383,10 @@ index 552929f..c97ba9c 100755
  DELETE_BINS="applypatch applypatch_static check_prereq recovery updater"
  
 +# If we have GApps we must delete some
-+if [ -f "$OUT/system/app/SetupWizard.apk" ]; then
-+echo "This is a GApps build!"
-+DELETE_APKS="Provision.apk QuickSearchBox.apk Gallery2.apk"
-+fi
++#if [ -f "$OUT/system/app/SetupWizard.apk" ]; then
++#echo "This is a GApps build!"
++#DELETE_APKS="Provision.apk QuickSearchBox.apk Gallery2.apk"
++#fi
 +
  REPACK=$OUT/repack.d
  printf "Sanitizing environment..."
@@ -399,10 +399,10 @@ index 552929f..c97ba9c 100755
  # Delete unnecessary binaries
  ( cd $REPACK/ota/system/bin; echo $DELETE_BINS | xargs rm -f; )
 +# ... and some app, if we have GApps
-+if [ -f "$OUT/system/app/SetupWizard.apk" ]; then
-+echo "Deleting conflicting apps..."
-+( cd $REPACK/ota/system/app; echo $DELETE_APKS | xargs rm -f; )
-+fi
++#if [ -f "$OUT/system/app/SetupWizard.apk" ]; then
++#echo "Deleting conflicting apps..."
++#( cd $REPACK/ota/system/app; echo $DELETE_APKS | xargs rm -f; )
++#fi
  
  # No need for recovery
  rm -rf $REPACK/ota/recovery
@@ -411,7 +411,7 @@ index 552929f..c97ba9c 100755
  
  # Determine what to name the new signed package
 -MODVERSION=`sed -n -e'/ro\.cm\.version/s/^.*=//p' $REPACK/ota/system/build.prop`
-+MODVERSION=`sed -n -e'/ro\.cm\.version/s/^.*=//p' $REPACK/ota/system/build.prop`_`date +%Y%m%d-%k%M`
++MODVERSION=`sed -n -e'/ro\.cm\.version/s/^.*=//p' $REPACK/ota/system/build.prop`_`date +%Y%m%d-%H%M`
  OUTFILE=$OUT/cm-$MODVERSION.zip
  echo MODVERSION: $MODVERSION
  
@@ -426,5 +426,5 @@ index 721e05d..aede0f6 100644
      add_lunch_combo $combo
  done
 -- 
-1.8.3.2
+2.3.0
 

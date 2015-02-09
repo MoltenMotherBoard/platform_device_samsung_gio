@@ -1,20 +1,20 @@
-From 24801fce895815f843152ce4d6ffbd11393645d4 Mon Sep 17 00:00:00 2001
-From: "itachisan@moltenmotherboard" <moltenmotherboard@gmail.com>
+From 87add3c0f0f82f903621ca21ba6fb07aaf2c3cae Mon Sep 17 00:00:00 2001
+From: "itachisan@moltenmotherboard" <itachisan@moltenmotherboard>
 Date: Fri, 26 Sep 2014 18:36:07 +0200
 Subject: [PATCH] Added tiny build config Adapted by CM10
 
 Change-Id: I5572fdc5a1f5dd04c4aa1a65ceef5baad0abe514
 ---
- target/product/tiny.mk |  219 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 219 insertions(+)
+ target/product/tiny.mk | 222 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 222 insertions(+)
  create mode 100644 target/product/tiny.mk
 
 diff --git a/target/product/tiny.mk b/target/product/tiny.mk
 new file mode 100644
-index 0000000..c6dc964
+index 0000000..a3257f5
 --- /dev/null
 +++ b/target/product/tiny.mk
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,222 @@
 +# Copyright (C) 2012 The Android Open Source Project
 +#
 +# Licensed under the Apache License, Version 2.0 (the "License");
@@ -84,8 +84,11 @@ index 0000000..c6dc964
 +    PackageInstaller \
 +    Phone \
 +    PicoTts \
++    Provision \
++    QuickSearchBox \
 +    Settings \
 +    SettingsProvider \
++    SetupWizard \
 +    SharedStorageBackup \
 +    SystemUI \
 +    TelephonyProvider \
@@ -235,5 +238,5 @@ index 0000000..c6dc964
 +#libstagefright_soft_mpeg4enc 
 +#libstagefright_soft_rawdec 
 -- 
-1.7.9.5
+2.3.0
 
