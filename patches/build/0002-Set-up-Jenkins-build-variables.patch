@@ -1,0 +1,35 @@
+From caa2d82ed4b5cc8d6fc5bdb6eed80fbdd0828d06 Mon Sep 17 00:00:00 2001
+From: Giovanni Santini <giovannisantini93@yahoo.it>
+Date: Tue, 10 Feb 2015 10:31:20 +0100
+Subject: [PATCH] Set up Jenkins build variables
+
+---
+ tools/buildinfo.sh | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/tools/buildinfo.sh b/tools/buildinfo.sh
+index 6475e64..236867a 100755
+--- a/tools/buildinfo.sh
++++ b/tools/buildinfo.sh
+@@ -12,8 +12,16 @@ echo "ro.build.version.release=$PLATFORM_VERSION"
+ echo "ro.build.date=`date`"
+ echo "ro.build.date.utc=`date +%s`"
+ echo "ro.build.type=$TARGET_BUILD_TYPE"
+-echo "ro.build.user=$USER"
+-echo "ro.build.host=`hostname`"
++
++if [ -z "$BUILD_USER_ID" ]
++then
++	echo "ro.build.user=$USER"
++	echo "ro.build.host=`hostname`"
++else
++	echo "ro.build.user=$BUILD_USER_ID"
++	echo "ro.build.host=moltenmotherboard"
++fi
++
+ echo "ro.build.tags=$BUILD_VERSION_TAGS"
+ echo "ro.product.model=$PRODUCT_MODEL"
+ echo "ro.product.brand=$PRODUCT_BRAND"
+-- 
+2.3.0
+
