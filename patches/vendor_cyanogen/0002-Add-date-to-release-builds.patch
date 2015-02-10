@@ -1,0 +1,31 @@
+From 377f61cbd0608dbfcc2f12dc6f1397c33cfa2544 Mon Sep 17 00:00:00 2001
+From: Giovanni Santini <giovannisantini93@yahoo.it>
+Date: Tue, 10 Feb 2015 10:47:00 +0100
+Subject: [PATCH] Add 'date' to release builds
+
+---
+ tools/squisher | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/tools/squisher b/tools/squisher
+index 1c56748..0c5ea4c 100755
+--- a/tools/squisher
++++ b/tools/squisher
+@@ -138,8 +138,14 @@ rm -rf $REPACK/ota/recovery
+ 	find $REPACK/ota/system/lib/modules -name "*.ko" -print0 | xargs -0 arm-eabi-strip --strip-unneeded
+ 
+ # Determine what to name the new signed package
++if [ -z "$CYANOGEN_RELEASE" ]
++then
+ 	MODVERSION=`sed -n -e'/ro\.modversion/s/^.*CyanogenMod-//p' $REPACK/ota/system/build.prop`
+ 	: ${MODVERSION:=nightly}
++else
++	MODVERSION=`sed -n -e'/ro\.modversion/s/^.*CyanogenMod-//p' $REPACK/ota/system/build.prop`_`date +%Y%m%d-%H%M`
++	: ${MODVERSION:=nightly}
++fi
+ 	OUTFILE=$OUT/cm-$MODVERSION.zip
+ 
+ # Pack it up and sign
+-- 
+2.3.0
+
