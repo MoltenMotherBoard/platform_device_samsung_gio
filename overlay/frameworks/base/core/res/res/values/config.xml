@@ -26,6 +26,9 @@
 
     <bool name="config_animateScreenLights">true</bool>
 
+    <!-- If this is true, the screen will come on when you unplug usb/power/whatever. -->
+    <bool name="config_unplugTurnsOnScreen">true</bool>
+
     <bool name="config_disableMenuKeyInLockScreen">true</bool>
     
     <bool name="config_batterySdCardAccessibility">true</bool>
@@ -58,6 +61,7 @@
          USB interfaces.  If the device doesn't want to support tething over USB this should
          be empty.  An example would be "usb.*" -->
     <string-array translatable="false" name="config_tether_usb_regexs">
+      <item>"rndis\\d"</item>
       <item>"usb\\d"</item>
     </string-array>
 
