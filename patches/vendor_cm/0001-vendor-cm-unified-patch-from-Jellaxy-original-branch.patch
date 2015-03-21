@@ -4,7 +4,6 @@ Date: Sat, 4 Oct 2014 18:45:24 +0200
 Subject: [PATCH] vendor/cm: unified patch from Jellaxy original branch
 
 ---
- CONTRIBUTORS.mkdn                      |  20 +---
  config/common.mk                       |  24 ++--
  config/common_mini_phone.mk            |  12 +-
  config/mini.ml                         |  19 +++
@@ -17,63 +16,11 @@ Subject: [PATCH] vendor/cm: unified patch from Jellaxy original branch
  prebuilt/common/etc/init.local.rc      |   4 -
  tools/opticharger                      |   2 +-
  vendorsetup.sh                         |   2 +-
- 13 files changed, 277 insertions(+), 85 deletions(-)
+ 12 files changed, 276 insertions(+), 82 deletions(-)
  create mode 100644 config/mini.ml
  create mode 100644 config/tiny.mk
  create mode 100644 jenkins-build-targets
 
-diff --git a/CONTRIBUTORS.mkdn b/CONTRIBUTORS.mkdn
-index ae5b6e4..31e833a 100644
---- a/CONTRIBUTORS.mkdn
-+++ b/CONTRIBUTORS.mkdn
-@@ -6,19 +6,14 @@ Maintainers (CyanogenMod 10):
- * __Acer A700:__ pawitp
- * __Asus EeePad Transformer (TF101):__ Bumble-Bee, EnJens
- * __Asus EeePad Transformer Prime (TF201):__ Bumble-Bee, EnJens
--* __Asus EeePad Transformer Pad (TF300T):__ xplodwild
--* __Asus EeePad Transformer Pad Infinity (TF700T):__ xplodwild, Aaron Echols, Markus Hoeber
-+* __Asus EeePad Transformer Pad TF300T:__ xplodwild
- * __B&N NookColor (encore):__ eyeballer, fattire, keyodi, krylon360, sluo (NookieDevs)
- * __Google Galaxy Nexus:__ , bekit, Bumble-Bee, burnsra, KalimochoAz
- * __Google Nexus S:__ burnsra, KalimochoAz
--* __Google Nexus 7:__ fattire
--* __Google Nexus 10:__ atinm, kornyone
--* __HTC Amaze 4G:__ sportsstar89, intervigil
-+* __Google Nexus 7:__ 
- * __HTC Evo 4G LTE:__ kushdeck, toastcfh
- * __HTC One S:__ intervigil, xkonni
- * __HTC One XL:__ h8rift, intervigil
--* __LG Optimus 3D {P920):__ arcee
--* __LG Optimus Black {P970):__ arcee
- * __LG Optimus LTE (P930) / LG Nitro HD {P935):__ arcee
- * __LG Optimus LTE (SK Telecom) (SU640):__ arcee
- * __Motorola Xoom (WiFi):__ bazar, SteadyHawkin, TDR (Team Rogue)
-@@ -53,13 +48,11 @@ Translators:
- ------------
- * __Catalan:__ Oriol Pellicer
- * __Croatian:__ Antonio Marin
--* __Czech:__ Ondrej Zima, Radovan Kepak, Pavel Kucera, Jozka Jozin, Jiri Silvarich, Vaclav Moucha
-+* __Czech:__ Ondrej Zima
- * __Dutch:__ Marco Brohet, Kasper Hettinga, Sam Segers, Bart Tiemersma, Eddy Witkamp
--* __Finnish:__ Antti Leukkunen, Niko Koivu
-+* __Finnish:__ Antti Leukkunen
- * __French:__ Sébastien Vaucher, David Girault, Tanguy Pruvot
--* __German:__ Kim Lê, Jacob Müller, Patrick Schaaf, Christoph Quiter, Markus Hoeber, Matthias Büchner
--* __Greek:__ Michael Bestas
--* __Hungarian:__ Tamás Tóth, Dávid László, Dániel Buga
-+* __German:__ Matthias Büchner, Alexander Hofbauer, Sebastian K., Ricco Thiel, Andreas Böhm, Kim Lê
- * __Italian:__ Francesco Foresta, Moreno Pojer, Eugenio Ziliotto, Giulio Cervera, Mauro Bazzano
- * __Japanese:__ Takuo Kitame
- * __Korean:__ Inseok Lee
-@@ -69,7 +62,6 @@ Translators:
- * __Russian:__ OlegKrikun, Pavel Volkov, Kir Kolyshkin
- * __Simplified Chinese:__ comercy, Qian Zheng, Andrew Jiang, John Hsing
- * __Slovak:__ Juraj Janecek
--* __Spanish:__ PeRiJeY, KalimochoAz, Chuckycrx, Jorge Ruesga, djMesias
-+* __Spanish:__ PeRiJeY, KalimochoAz, Chuckycrx, Jorge Ruesga
- * __Swedish:__ Patrik Kullman
- * __Traditional Chinese:__ Ladios Jonquil
--* __Turkish:__ Ethem Evlice (androidmeda)
 diff --git a/config/common.mk b/config/common.mk
 index 7a27fb0..6db5581 100644
 --- a/config/common.mk
