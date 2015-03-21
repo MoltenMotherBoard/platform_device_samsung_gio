@@ -1,5 +1,5 @@
-From 24801fce895815f843152ce4d6ffbd11393645d4 Mon Sep 17 00:00:00 2001
-From: "itachisan@moltenmotherboard" <moltenmotherboard@gmail.com>
+From 607c7ca59269486946e558c932d5aad4f3e9ace5 Mon Sep 17 00:00:00 2001
+From: Giovanni Santini <giovannisantini93@yahoo.it>
 Date: Fri, 26 Sep 2014 18:36:07 +0200
 Subject: [PATCH] Added tiny build config Adapted by CM10
 
@@ -11,7 +11,7 @@ Change-Id: I5572fdc5a1f5dd04c4aa1a65ceef5baad0abe514
 
 diff --git a/target/product/tiny.mk b/target/product/tiny.mk
 new file mode 100644
-index 0000000..c6dc964
+index 0000000..67ff5d6
 --- /dev/null
 +++ b/target/product/tiny.mk
 @@ -0,0 +1,218 @@
@@ -195,7 +195,7 @@ index 0000000..c6dc964
 +        system/bluetooth/data/blacklist.conf:system/etc/bluetooth/blacklist.conf \
 +        system/bluetooth/data/input.conf:system/etc/bluetooth/input.conf \
 +        system/bluetooth/data/network.conf:system/etc/bluetooth/network.conf \
-+	frameworks/base/media/libeffects/data/audio_effects.conf:system/etc/audio_effects.conf
++        frameworks/av/media/libeffects/data/audio_effects.conf:system/etc/audio_effects.conf
 +
 +# Get some sounds
 +$(call inherit-product-if-exists, frameworks/base/data/sounds/OldAudio.mk)
@@ -235,3 +235,4 @@ index 0000000..c6dc964
 +#libstagefright_soft_rawdec 
 -- 
 1.7.9.5
+
