@@ -13,5 +13,5 @@ for i in $(find "$PATCHBASE"/* -type d); do
         done
         echo applying $PATCHNAME to $PATCHTARGET
         cd "$CMBASE/$PATCHTARGET" || exit 1
-        git am -3 "$PATCHBASE/$PATCHNAME"/* || exit 1
+        git am -3 --ignore-whitespace "$PATCHBASE/$PATCHNAME"/* || exit 1
 done
