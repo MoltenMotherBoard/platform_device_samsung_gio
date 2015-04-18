@@ -1,0 +1,22 @@
+From 2b9e69b9d508096daf61d037ea0444f86f69c1d4 Mon Sep 17 00:00:00 2001
+From: Giovanni Santini <giovannisantini93@yahoo.it>
+Date: Sat, 18 Apr 2015 12:14:43 +0200
+Subject: [PATCH] Fix files path for the newer Term.apk
+
+---
+ get-prebuilts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/get-prebuilts b/get-prebuilts
+index 215f292..703059f 100755
+--- a/get-prebuilts
++++ b/get-prebuilts
+@@ -4,4 +4,4 @@ mkdir -p $BASEDIR/proprietary
+ 
+ # Get Android Terminal Emulator (we use a prebuilt so it can update from the Market)
+ curl -L -o $BASEDIR/proprietary/Term.apk -O -L http://jackpal.github.com/Android-Terminal-Emulator/downloads/Term.apk
+-unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/armeabi/libjackpal-androidterm4.so
++unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/armeabi/libjackpal-androidterm5.so lib/armeabi/libjackpal-termexec2.so
+-- 
+2.3.5
+
