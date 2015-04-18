@@ -1,12 +1,44 @@
-From 2b9e69b9d508096daf61d037ea0444f86f69c1d4 Mon Sep 17 00:00:00 2001
+From f2437dd62528bc6521ddc6491b0c9c4754acf925 Mon Sep 17 00:00:00 2001
 From: Giovanni Santini <giovannisantini93@yahoo.it>
 Date: Sat, 18 Apr 2015 12:14:43 +0200
 Subject: [PATCH] Fix files path for the newer Term.apk
 
 ---
- get-prebuilts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ config/common.mk      | 5 +++--
+ config/common_mini.mk | 3 ++-
+ get-prebuilts         | 2 +-
+ 3 files changed, 6 insertions(+), 4 deletions(-)
 
+diff --git a/config/common.mk b/config/common.mk
+index 4c68deb..d81b323 100644
+--- a/config/common.mk
++++ b/config/common.mk
+@@ -51,8 +51,9 @@ PRODUCT_COPY_FILES += \
+ 
+ PRODUCT_COPY_FILES +=  \
+     vendor/cm/proprietary/Term.apk:system/app/Term.apk \
+-    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm4.so:system/lib/libjackpal-androidterm4.so \
+-	vendor/cm/prebuilt/common/apps/Superuser.apk:system/app/Superuser.apk
++    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm5.so:system/lib/libjackpal-androidterm5.so \
++    vendor/cm/proprietary/lib/armeabi/libjackpal-termexec2.so:system/lib/libjackpal-termexec2.so \
++    vendor/cm/prebuilt/common/apps/Superuser.apk:system/app/Superuser.apk
+ 
+ # Enable SIP+VoIP on all targets
+ PRODUCT_COPY_FILES += \
+diff --git a/config/common_mini.mk b/config/common_mini.mk
+index b374186..f378a9f 100644
+--- a/config/common_mini.mk
++++ b/config/common_mini.mk
+@@ -50,7 +50,8 @@ PRODUCT_COPY_FILES += \
+ 
+ PRODUCT_COPY_FILES +=  \
+     vendor/cm/proprietary/Term.apk:system/app/Term.apk \
+-    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm4.so:system/lib/libjackpal-androidterm4.so \
++    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm5.so:system/lib/libjackpal-androidterm5.so \
++    vendor/cm/proprietary/lib/armeabi/libjackpal-termexec2.so:system/lib/libjackpal-termexec2.so \
+     vendor/cm/prebuilt/common/apps/Superuser.apk:system/app/Superuser.apk
+ 
+ # Bring in camera effects
 diff --git a/get-prebuilts b/get-prebuilts
 index 215f292..703059f 100755
 --- a/get-prebuilts
