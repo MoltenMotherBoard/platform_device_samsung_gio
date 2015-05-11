@@ -1,0 +1,54 @@
+From 87fe12fae05664043150c2592ee425f51e9239e8 Mon Sep 17 00:00:00 2001
+From: Giovanni Santini <giovannisantini93@yahoo.it>
+Date: Mon, 11 May 2015 19:21:57 +0200
+Subject: [PATCH] Fix files path for the newer Term.apk
+
+Change-Id: Ic7f0b74d1cfffc8fe3ae88036b8456685edea78d
+---
+ config/common.mk |    3 ++-
+ config/tiny.mk   |    3 ++-
+ get-prebuilts    |    2 +-
+ 3 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/config/common.mk b/config/common.mk
+index 6db5581..2bcc3a8 100644
+--- a/config/common.mk
++++ b/config/common.mk
+@@ -100,7 +100,8 @@ PRODUCT_COPY_FILES += \
+ 
+ PRODUCT_COPY_FILES +=  \
+     vendor/cm/proprietary/Term.apk:system/app/Term.apk \
+-    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm4.so:system/lib/libjackpal-androidterm4.so
++    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm5.so:system/lib/libjackpal-androidterm5.so \
++    vendor/cm/proprietary/lib/armeabi/libjackpal-termexec2.so:system/lib/libjackpal-termexec2.so
+ 
+ # Bring in camera effects
+ #PRODUCT_COPY_FILES +=  \
+diff --git a/config/tiny.mk b/config/tiny.mk
+index 78e575a..556085e 100644
+--- a/config/tiny.mk
++++ b/config/tiny.mk
+@@ -103,7 +103,8 @@ PRODUCT_COPY_FILES += \
+ 
+ PRODUCT_COPY_FILES +=  \
+     vendor/cm/proprietary/Term.apk:system/app/Term.apk \
+-    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm4.so:system/lib/libjackpal-androidterm4.so
++    vendor/cm/proprietary/lib/armeabi/libjackpal-androidterm5.so:system/lib/libjackpal-androidterm5.so \
++    vendor/cm/proprietary/lib/armeabi/libjackpal-termexec2.so:system/lib/libjackpal-termexec2.so
+ 
+ # Bring in camera effects
+ PRODUCT_COPY_FILES +=  \
+diff --git a/get-prebuilts b/get-prebuilts
+index 43b3435..3d97076 100755
+--- a/get-prebuilts
++++ b/get-prebuilts
+@@ -4,5 +4,5 @@ mkdir -p $BASEDIR/proprietary
+ 
+ # Get Android Terminal Emulator (we use a prebuilt so it can update from the Market)
+ curl -L -o $BASEDIR/proprietary/Term.apk -O -L http://jackpal.github.com/Android-Terminal-Emulator/downloads/Term.apk
+-unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/armeabi/libjackpal-androidterm4.so
++unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/armeabi/libjackpal-androidterm5.so lib/armeabi/libjackpal-termexec2.so
+ 
+-- 
+1.7.9.5
+
