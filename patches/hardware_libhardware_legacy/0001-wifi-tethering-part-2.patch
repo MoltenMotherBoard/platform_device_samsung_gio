@@ -1,0 +1,42 @@
+From 781607214e6464f1639e66e17d8cb9ec28dc22a6 Mon Sep 17 00:00:00 2001
+From: Giovanni Santini <giovannisantini93@yahoo.it>
+Date: Mon, 11 May 2015 22:12:39 +0200
+Subject: [PATCH] Wifi Tethering [2/3]
+
+Change-Id: Ie085ab4cf5c6d621c9123e46a46f7be9b8a266bb
+---
+ wifi/Android.mk |    3 +++
+ wifi/wifi.c     |    3 +++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/wifi/Android.mk b/wifi/Android.mk
+index 3b89a17..3d15e60 100644
+--- a/wifi/Android.mk
++++ b/wifi/Android.mk
+@@ -9,6 +9,9 @@ endif
+ ifdef WIFI_DRIVER_MODULE_ARG
+ LOCAL_CFLAGS += -DWIFI_DRIVER_MODULE_ARG=\"$(WIFI_DRIVER_MODULE_ARG)\"
+ endif
++ifdef WIFI_DRIVER_MODULE_AP_ARG
++LOCAL_CFLAGS += -DWIFI_DRIVER_MODULE_AP_ARG=\"$(WIFI_DRIVER_MODULE_AP_ARG)\"
++endif
+ ifdef WIFI_DRIVER_MODULE_NAME
+ LOCAL_CFLAGS += -DWIFI_DRIVER_MODULE_NAME=\"$(WIFI_DRIVER_MODULE_NAME)\"
+ endif
+diff --git a/wifi/wifi.c b/wifi/wifi.c
+index 656659f..c398748 100644
+--- a/wifi/wifi.c
++++ b/wifi/wifi.c
+@@ -68,6 +68,9 @@ static char primary_iface[PROPERTY_VALUE_MAX];
+ #ifndef WIFI_DRIVER_MODULE_ARG
+ #define WIFI_DRIVER_MODULE_ARG          ""
+ #endif
++#ifndef WIFI_DRIVER_MODULE_AP_ARG
++#define WIFI_DRIVER_MODULE_AP_ARG       ""
++#endif
+ #ifndef WIFI_FIRMWARE_LOADER
+ #define WIFI_FIRMWARE_LOADER		""
+ #endif
+-- 
+1.7.9.5
+
