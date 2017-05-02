@@ -1,4 +1,4 @@
-From bddc3244761fd01cef8f4ac433a14681ae5d02ed Mon Sep 17 00:00:00 2001
+From 6fed00fe93fe3bcc366221be491cc9cd4bfb8757 Mon Sep 17 00:00:00 2001
 From: streambinder <davidepucci@hiddenhost.org>
 Date: Sat, 4 Oct 2014 18:45:24 +0200
 Subject: [PATCH] vendor/cm: unified patch from Jellaxy original branch
@@ -8,7 +8,7 @@ Subject: [PATCH] vendor/cm: unified patch from Jellaxy original branch
  config/common_mini_phone.mk            |  12 +-
  config/mini.ml                         |  19 +++
  config/tiny.mk                         | 211 +++++++++++++++++++++++++++++++++
- get-prebuilts                          |   3 +-
+ get-prebuilts                          |   6 +-
  jenkins-build-targets                  |   0
  prebuilt/common/bin/backuptool.sh      |  17 +--
  prebuilt/common/etc/apns-conf-cdma.xml |  44 +++----
@@ -16,7 +16,7 @@ Subject: [PATCH] vendor/cm: unified patch from Jellaxy original branch
  prebuilt/common/etc/init.local.rc      |   4 -
  tools/opticharger                      |   2 +-
  vendorsetup.sh                         |   2 +-
- 12 files changed, 276 insertions(+), 82 deletions(-)
+ 12 files changed, 272 insertions(+), 73 deletions(-)
  create mode 100644 config/mini.ml
  create mode 100644 config/tiny.mk
  create mode 100644 jenkins-build-targets
@@ -359,20 +359,21 @@ index 0000000..78e575a
 +  ro.modversion=$(CM_VERSION)
 +
 diff --git a/get-prebuilts b/get-prebuilts
-index 1d2b6df..43b3435 100755
+index 1e2c04a..215f292 100755
 --- a/get-prebuilts
 +++ b/get-prebuilts
-@@ -1,9 +1,8 @@
+@@ -1,9 +1,7 @@
 -
  BASEDIR=`dirname $0`
  
  mkdir -p $BASEDIR/proprietary
  
  # Get Android Terminal Emulator (we use a prebuilt so it can update from the Market)
- curl -L -o $BASEDIR/proprietary/Term.apk -O -L http://jackpal.github.com/Android-Terminal-Emulator/downloads/Term.apk
+-curl -L -o $BASEDIR/proprietary/Term.apk -O -L https://jackpal.github.io/Android-Terminal-Emulator/downloads/Term-1.0.65.apk
 -unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/*
+-
++curl -L -o $BASEDIR/proprietary/Term.apk -O -L http://jackpal.github.com/Android-Terminal-Emulator/downloads/Term.apk
 +unzip -o -d $BASEDIR/proprietary $BASEDIR/proprietary/Term.apk lib/armeabi/libjackpal-androidterm4.so
- 
 diff --git a/jenkins-build-targets b/jenkins-build-targets
 new file mode 100644
 index 0000000..e69de29
@@ -617,4 +618,5 @@ index 1168473..aede0f6 100644
      add_lunch_combo $combo
  done
 -- 
-2.1.2
+2.12.2
+
